@@ -40,9 +40,17 @@ jobs:
       
     - name: Restore dependencies
       run: dotnet restore $env:Solution_Name
+    
+    - name: Build CubeKit.UI first
+      run: msbuild CubeKit.UI\CubeKit.UI.csproj /t:Restore,Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxPackageSigningEnabled=false
+      continue-on-error: false
+    
+    - name: Build Clippy.Core
+      run: msbuild Clippy.Core\Clippy.Core.csproj /t:Restore,Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxPackageSigningEnabled=false
+      continue-on-error: false
       
     - name: Build solution
-      run: msbuild $env:Solution_Name /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion
+      run: msbuild $env:Solution_Name /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion /verbosity:minimal
       
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
