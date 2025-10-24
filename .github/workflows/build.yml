@@ -1,0 +1,87 @@
+name: Build Clippy
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    env:
+      Solution_Name: Clippy.sln
+      Configuration: Release
+      Platform: x64
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+      
+    - name: Restore NuGet packages
+      run: nuget restore $env:Solution_Name
+      
+    - name: Restore dependencies
+      run: dotnet restore $env:Solution_Name
+      
+    - name: Build solution
+      run: msbuild $env:Solution_Name /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Clippy-Build-${{ github.sha }}
+        path: |
+          **/bin/${{ env.Configuration }}/**/*.exe
+          **/bin/${{ env.Configuration }}/**/*.dll
+          **/AppPackages/**
+        retention-days: 30
+
+  # Опциональный job для создания MSIX пакета
+  package:
+    runs-on: windows-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    
+    env:
+      Solution_Name: Clippy.sln
+      Configuration: Release
+      Platform: x64
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+      
+    - name: Restore NuGet packages
+      run: nuget restore $env:Solution_Name
+      
+    - name: Build and Package
+      run: |
+        msbuild $env:Solution_Name /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Always /p:AppxBundlePlatforms=$env:Platform /p:UapAppxPackageBuildMode=SideloadOnly /p:GenerateAppxPackageOnBuild=true
+        
+    - name: Upload MSIX Package
+      uses: actions/upload-artifact@v4
+      with:
+        name: Clippy-MSIX-Package
+        path: |
+          **/AppPackages/**/*.msix
+          **/AppPackages/**/*.msixbundle
+        retention-days: 90
