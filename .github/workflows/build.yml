@@ -27,9 +27,13 @@ jobs:
         
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
+    
+    - name: Add CommunityToolkit Labs NuGet source
+      run: |
+        dotnet nuget add source https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json --name CommunityToolkit-Labs
       
     - name: Restore NuGet packages
-      run: nuget restore $env:Solution_Name
+      run: nuget restore $env:Solution_Name -Source "https://api.nuget.org/v3/index.json;https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json"
       
     - name: Restore dependencies
       run: dotnet restore $env:Solution_Name
@@ -69,9 +73,13 @@ jobs:
         
     - name: Setup MSBuild
       uses: microsoft/setup-msbuild@v2
+    
+    - name: Add CommunityToolkit Labs NuGet source
+      run: |
+        dotnet nuget add source https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json --name CommunityToolkit-Labs
       
     - name: Restore NuGet packages
-      run: nuget restore $env:Solution_Name
+      run: nuget restore $env:Solution_Name -Source "https://api.nuget.org/v3/index.json;https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json"
       
     - name: Build and Package
       run: |
