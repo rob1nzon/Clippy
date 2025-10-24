@@ -9,12 +9,13 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2022
     
     env:
       Solution_Name: Clippy.sln
       Configuration: Release
       Platform: x64
+      TargetPlatformVersion: 10.0.22621.0
       
     steps:
     - name: Checkout code
@@ -25,8 +26,10 @@ jobs:
       with:
         dotnet-version: '8.0.x'
         
-    - name: Setup MSBuild
+    - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
+      with:
+        msbuild-architecture: x64
     
     - name: Add CommunityToolkit Labs NuGet source
       run: |
@@ -39,7 +42,7 @@ jobs:
       run: dotnet restore $env:Solution_Name
       
     - name: Build solution
-      run: msbuild $env:Solution_Name /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly
+      run: msbuild $env:Solution_Name /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion
       
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -53,14 +56,15 @@ jobs:
 
   # Опциональный job для создания MSIX пакета
   package:
-    runs-on: windows-latest
+    runs-on: windows-2022
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
     
     env:
       Solution_Name: Clippy.sln
       Configuration: Release
       Platform: x64
+      TargetPlatformVersion: 10.0.22621.0
       
     steps:
     - name: Checkout code
@@ -71,8 +75,10 @@ jobs:
       with:
         dotnet-version: '8.0.x'
         
-    - name: Setup MSBuild
+    - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
+      with:
+        msbuild-architecture: x64
     
     - name: Add CommunityToolkit Labs NuGet source
       run: |
@@ -83,7 +89,7 @@ jobs:
       
     - name: Build and Package
       run: |
-        msbuild $env:Solution_Name /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Always /p:AppxBundlePlatforms=$env:Platform /p:UapAppxPackageBuildMode=SideloadOnly /p:GenerateAppxPackageOnBuild=true
+        msbuild $env:Solution_Name /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Always /p:AppxBundlePlatforms=$env:Platform /p:UapAppxPackageBuildMode=SideloadOnly /p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion
         
     - name: Upload MSIX Package
       uses: actions/upload-artifact@v4
