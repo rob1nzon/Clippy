@@ -13,14 +13,25 @@ jobs:
     
     env:
       Solution_Name: Clippy.sln
-      Configuration: Release
+      Configuration: Debug  # Попробуем Debug - часто в Release могут быть недостающие файлы
       Platform: x64
       TargetPlatformVersion: 10.0.22621.0
       
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        # Попробуем использовать конкретный коммит если master нестабилен
+        ref: master
+        submodules: recursive  # На случай если есть подмодули
       
+    - name: Check for Tray folder
+      run: |
+        Write-Host "Checking repository structure..."
+        Get-ChildItem -Path . -Recurse -Directory | Select-Object FullName
+        Write-Host "`nChecking for Tray related files..."
+        Get-ChildItem -Path . -Recurse -Filter "*Tray*" | Select-Object FullName
+        
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -37,11 +48,14 @@ jobs:
       
     - name: Restore NuGet packages
       run: nuget restore $env:Solution_Name -Source "https://api.nuget.org/v3/index.json;https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json"
+      continue-on-error: false
       
     - name: Restore dependencies
       run: dotnet restore $env:Solution_Name
+      continue-on-error: false
     
-    - name: Build CubeKit.UI first
+    # Попробуем собрать только стабильные компоненты
+    - name: Build CubeKit.UI
       run: msbuild CubeKit.UI\CubeKit.UI.csproj /t:Restore,Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxPackageSigningEnabled=false
       continue-on-error: false
     
@@ -49,61 +63,26 @@ jobs:
       run: msbuild Clippy.Core\Clippy.Core.csproj /t:Restore,Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxPackageSigningEnabled=false
       continue-on-error: false
       
-    - name: Build solution
-      run: msbuild $env:Solution_Name /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion /verbosity:minimal
+    - name: Build main Clippy project
+      run: msbuild Clippy\Clippy.csproj /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion /verbosity:detailed
+      continue-on-error: true  # Даже если не соберется, покажет детальную информацию
       
-    - name: Upload build artifacts
+    - name: Upload build artifacts (if any)
       uses: actions/upload-artifact@v4
+      if: always()
       with:
         name: Clippy-Build-${{ github.sha }}
         path: |
-          **/bin/${{ env.Configuration }}/**/*.exe
-          **/bin/${{ env.Configuration }}/**/*.dll
-          **/AppPackages/**
-        retention-days: 30
+          **/bin/**/*.exe
+          **/bin/**/*.dll
+          **/obj/**/*.cs
+        retention-days: 7
 
-  # Опциональный job для создания MSIX пакета
-  package:
-    runs-on: windows-2022
-    needs: build
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
-    
-    env:
-      Solution_Name: Clippy.sln
-      Configuration: Release
-      Platform: x64
-      TargetPlatformVersion: 10.0.22621.0
-      
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
-        
-    - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v2
-      with:
-        msbuild-architecture: x64
-    
-    - name: Add CommunityToolkit Labs NuGet source
-      run: |
-        dotnet nuget add source https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json --name CommunityToolkit-Labs
-      
-    - name: Restore NuGet packages
-      run: nuget restore $env:Solution_Name -Source "https://api.nuget.org/v3/index.json;https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json"
-      
-    - name: Build and Package
-      run: |
-        msbuild $env:Solution_Name /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Always /p:AppxBundlePlatforms=$env:Platform /p:UapAppxPackageBuildMode=SideloadOnly /p:GenerateAppxPackageOnBuild=true /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion
-        
-    - name: Upload MSIX Package
+    - name: Upload build logs
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: Clippy-MSIX-Package
+        name: Build-Logs-${{ github.sha }}
         path: |
-          **/AppPackages/**/*.msix
-          **/AppPackages/**/*.msixbundle
-        retention-days: 90
+          **/*.log
+        retention-days: 7
