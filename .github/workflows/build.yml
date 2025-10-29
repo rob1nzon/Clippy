@@ -64,8 +64,23 @@ jobs:
       continue-on-error: false
       
     - name: Build main Clippy project
-      run: msbuild Clippy\Clippy.csproj /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion /verbosity:detailed
+      run: msbuild Clippy\Clippy.csproj /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion /p:GenerateAppxPackageOnBuild=false /verbosity:detailed
       continue-on-error: true  # Даже если не соберется, покажет детальную информацию
+    
+    - name: Build MSIX Package
+      run: |
+        msbuild Clippy\Clippy.csproj /t:Build,Publish /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxBundle=Never /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages\" /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true
+      continue-on-error: true
+      
+    - name: Find executables
+      run: |
+        Write-Host "Searching for EXE files..."
+        Get-ChildItem -Path . -Recurse -Filter "*.exe" | Select-Object FullName, Length, LastWriteTime
+        Write-Host "`nSearching in bin folders..."
+        Get-ChildItem -Path . -Recurse -Filter "bin" -Directory | ForEach-Object {
+          Write-Host "`nContents of $($_.FullName):"
+          Get-ChildItem -Path $_.FullName -Recurse | Select-Object FullName, Length
+        }
       
     - name: Upload build artifacts (if any)
       uses: actions/upload-artifact@v4
@@ -73,9 +88,9 @@ jobs:
       with:
         name: Clippy-Build-${{ github.sha }}
         path: |
-          **/bin/**/*.exe
-          **/bin/**/*.dll
-          **/obj/**/*.cs
+          **/bin/Debug/**
+          **/bin/x64/**
+          **/AppPackages/**
         retention-days: 7
 
     - name: Upload build logs
