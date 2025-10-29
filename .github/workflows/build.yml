@@ -31,6 +31,43 @@ jobs:
         Get-ChildItem -Path . -Recurse -Directory | Select-Object FullName
         Write-Host "`nChecking for Tray related files..."
         Get-ChildItem -Path . -Recurse -Filter "*Tray*" | Select-Object FullName
+    
+    - name: Patch App.xaml.cs to remove Tray dependency
+      shell: pwsh
+      run: |
+        $appXamlCs = "Clippy\App.xaml.cs"
+        if (Test-Path $appXamlCs) {
+          Write-Host "Reading App.xaml.cs..."
+          $lines = Get-Content $appXamlCs
+          
+          Write-Host "Patching App.xaml.cs to remove Tray dependency..."
+          $newLines = @()
+          $skipBlock = $false
+          
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            $line = $lines[$i]
+            
+            # Comment out using Clippy.Tray
+            if ($line -match 'using Clippy\.Tray') {
+              $newLines += "        // $line  // Patched: Tray not available"
+              continue
+            }
+            
+            # Comment out TrayFlyoutWindow declarations and usage
+            if ($line -match 'TrayFlyoutWindow') {
+              $newLines += "        // $line  // Patched: Tray not available"
+              continue
+            }
+            
+            $newLines += $line
+          }
+          
+          Set-Content $appXamlCs -Value $newLines
+          Write-Host "✓ Patch applied successfully"
+        } else {
+          Write-Host "✗ App.xaml.cs not found!"
+          exit 1
+        }
         
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
