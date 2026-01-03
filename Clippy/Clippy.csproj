@@ -16,7 +16,7 @@
     <PackageCertificateThumbprint>3E4148A36277D5E342AEAE4759BDF4C13A5E8EBA</PackageCertificateThumbprint>
     <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
     <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
-    <AppxPackageDir>D:\Repos\Clippy\Clippy\AppPackagesSideloading\</AppxPackageDir>
+    <AppxPackageDir>$(MSBuildProjectDirectory)\AppPackagesSideloading\</AppxPackageDir>
     <AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
     <GenerateTestArtifacts>True</GenerateTestArtifacts>
     <AppxBundle>Always</AppxBundle>
