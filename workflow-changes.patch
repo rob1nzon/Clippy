@@ -1,0 +1,481 @@
+From 859aa72d0bc6d2712f84c0e94d377fd3166e5103 Mon Sep 17 00:00:00 2001
+From: Roo Code <roomote@roocode.com>
+Date: Sat, 3 Jan 2026 22:20:58 +0000
+Subject: [PATCH 1/2] feat: add release workflow to build and upload MSIX
+ packages
+
+- Created release.yml workflow that builds MSIX packages for x64, x86, and arm64
+- Workflow triggers on release creation, tag push, and workflow_dispatch
+- Automatically uploads MSIX packages to GitHub releases
+- Improved build.yml to focus on CI testing only
+- Release workflow handles building Release configuration packages
+- CI workflow handles Debug and Release builds for testing
+---
+ .github/workflows/build.yml   | 104 +++++---------------
+ .github/workflows/release.yml | 173 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 196 insertions(+), 81 deletions(-)
+ create mode 100644 .github/workflows/release.yml
+
+diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
+index c7a0857..c4b341b 100644
+--- a/.github/workflows/build.yml
++++ b/.github/workflows/build.yml
+@@ -1,8 +1,10 @@
+-name: Build Clippy
++name: CI Build
+ 
+ on:
+   push:
+     branches: [ master, main ]
++    tags-ignore:
++      - '*'
+   pull_request:
+     branches: [ master, main ]
+   workflow_dispatch:
+@@ -11,58 +13,35 @@ jobs:
+   build:
+     runs-on: windows-2022
+     
++    strategy:
++      matrix:
++        configuration: [Debug, Release]
++        platform: [x64]
++    
+     env:
+       Solution_Name: Clippy.sln
+-      Configuration: Debug  # Попробуем Debug - часто в Release могут быть недостающие файлы
+-      Platform: x64
+-      TargetPlatformVersion: 10.0.22621.0
+       
+     steps:
+     - name: Checkout code
+       uses: actions/checkout@v4
+       with:
+-        # Попробуем использовать конкретный коммит если master нестабилен
+-        ref: master
+-        submodules: recursive  # На случай если есть подмодули
++        submodules: recursive
+       
+-    - name: Check for Tray folder
+-      run: |
+-        Write-Host "Checking repository structure..."
+-        Get-ChildItem -Path . -Recurse -Directory | Select-Object FullName
+-        Write-Host "`nChecking for Tray related files..."
+-        Get-ChildItem -Path . -Recurse -Filter "*Tray*" | Select-Object FullName
+-    
+     - name: Patch App.xaml.cs to remove Tray dependency
+       shell: pwsh
+       run: |
+         $appXamlCs = "Clippy\App.xaml.cs"
+         if (Test-Path $appXamlCs) {
+-          Write-Host "Reading App.xaml.cs..."
+-          $lines = Get-Content $appXamlCs
+-          
+           Write-Host "Patching App.xaml.cs to remove Tray dependency..."
+-          $newLines = @()
+-          $skipBlock = $false
++          $content = Get-Content $appXamlCs -Raw
++          
++          # Comment out using Clippy.Tray
++          $content = $content -replace '(\s*using Clippy\.Tray;)', '        // $1  // Patched: Tray not available'
+           
+-          for ($i = 0; $i -lt $lines.Count; $i++) {
+-            $line = $lines[$i]
+-            
+-            # Comment out using Clippy.Tray
+-            if ($line -match 'using Clippy\.Tray') {
+-              $newLines += "        // $line  // Patched: Tray not available"
+-              continue
+-            }
+-            
+-            # Comment out TrayFlyoutWindow declarations and usage
+-            if ($line -match 'TrayFlyoutWindow') {
+-              $newLines += "        // $line  // Patched: Tray not available"
+-              continue
+-            }
+-            
+-            $newLines += $line
+-          }
++          # Comment out TrayFlyoutWindow declarations and usage
++          $content = $content -replace '(.*TrayFlyoutWindow.*)', '        // $1  // Patched: Tray not available'
+           
+-          Set-Content $appXamlCs -Value $newLines
++          Set-Content $appXamlCs -Value $content -NoNewline
+           Write-Host "✓ Patch applied successfully"
+         } else {
+           Write-Host "✗ App.xaml.cs not found!"
+@@ -85,56 +64,19 @@ jobs:
+       
+     - name: Restore NuGet packages
+       run: nuget restore $env:Solution_Name -Source "https://api.nuget.org/v3/index.json;https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json"
+-      continue-on-error: false
+       
+     - name: Restore dependencies
+       run: dotnet restore $env:Solution_Name
+-      continue-on-error: false
+     
+-    # Попробуем собрать только стабильные компоненты
+-    - name: Build CubeKit.UI
+-      run: msbuild CubeKit.UI\CubeKit.UI.csproj /t:Restore,Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxPackageSigningEnabled=false
+-      continue-on-error: false
+-    
+-    - name: Build Clippy.Core
+-      run: msbuild Clippy.Core\Clippy.Core.csproj /t:Restore,Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxPackageSigningEnabled=false
+-      continue-on-error: false
+-      
+-    - name: Build main Clippy project
+-      run: msbuild Clippy\Clippy.csproj /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion /p:GenerateAppxPackageOnBuild=false /verbosity:detailed
+-      continue-on-error: true  # Даже если не соберется, покажет детальную информацию
+-    
+-    - name: Build MSIX Package
+-      run: |
+-        msbuild Clippy\Clippy.csproj /t:Build,Publish /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxBundle=Never /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages\" /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true
+-      continue-on-error: true
++    - name: Build solution
++      run: msbuild $env:Solution_Name /t:Build /p:Configuration=${{ matrix.configuration }} /p:Platform=${{ matrix.platform }} /p:AppxPackageSigningEnabled=false /verbosity:minimal
+       
+-    - name: Find executables
+-      run: |
+-        Write-Host "Searching for EXE files..."
+-        Get-ChildItem -Path . -Recurse -Filter "*.exe" | Select-Object FullName, Length, LastWriteTime
+-        Write-Host "`nSearching in bin folders..."
+-        Get-ChildItem -Path . -Recurse -Filter "bin" -Directory | ForEach-Object {
+-          Write-Host "`nContents of $($_.FullName):"
+-          Get-ChildItem -Path $_.FullName -Recurse | Select-Object FullName, Length
+-        }
+-      
+-    - name: Upload build artifacts (if any)
+-      uses: actions/upload-artifact@v4
+-      if: always()
+-      with:
+-        name: Clippy-Build-${{ github.sha }}
+-        path: |
+-          **/bin/Debug/**
+-          **/bin/x64/**
+-          **/AppPackages/**
+-        retention-days: 7
+-
+-    - name: Upload build logs
++    - name: Upload build artifacts
+       uses: actions/upload-artifact@v4
+-      if: always()
++      if: matrix.configuration == 'Release'
+       with:
+-        name: Build-Logs-${{ github.sha }}
++        name: Clippy-CI-Build-${{ matrix.platform }}-${{ github.sha }}
+         path: |
+-          **/*.log
++          **/bin/${{ matrix.configuration }}/**/*.exe
++          **/bin/${{ matrix.configuration }}/**/*.dll
+         retention-days: 7
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+new file mode 100644
+index 0000000..c84eea5
+--- /dev/null
++++ b/.github/workflows/release.yml
+@@ -0,0 +1,173 @@
++name: Build and Release
++
++on:
++  release:
++    types: [created, published]
++  push:
++    tags:
++      - '*'
++  workflow_dispatch:
++    inputs:
++      tag:
++        description: 'Tag to release'
++        required: true
++        type: string
++
++permissions:
++  contents: write
++
++jobs:
++  build-and-release:
++    runs-on: windows-2022
++    
++    strategy:
++      matrix:
++        platform: [x64, x86, arm64]
++    
++    env:
++      Solution_Name: Clippy.sln
++      Configuration: Release
++      
++    steps:
++    - name: Checkout code
++      uses: actions/checkout@v4
++      with:
++        submodules: recursive
++        fetch-depth: 0
++      
++    - name: Patch App.xaml.cs to remove Tray dependency
++      shell: pwsh
++      run: |
++        $appXamlCs = "Clippy\App.xaml.cs"
++        if (Test-Path $appXamlCs) {
++          Write-Host "Reading App.xaml.cs..."
++          $content = Get-Content $appXamlCs -Raw
++          
++          # Comment out using Clippy.Tray
++          $content = $content -replace '(\s*using Clippy\.Tray;)', '        // $1  // Patched: Tray not available'
++          
++          # Comment out TrayFlyoutWindow declarations and usage
++          $content = $content -replace '(.*TrayFlyoutWindow.*)', '        // $1  // Patched: Tray not available'
++          
++          Set-Content $appXamlCs -Value $content -NoNewline
++          Write-Host "✓ Patch applied successfully"
++        } else {
++          Write-Host "✗ App.xaml.cs not found!"
++          exit 1
++        }
++        
++    - name: Setup .NET
++      uses: actions/setup-dotnet@v4
++      with:
++        dotnet-version: '8.0.x'
++        
++    - name: Add MSBuild to PATH
++      uses: microsoft/setup-msbuild@v2
++      with:
++        msbuild-architecture: x64
++    
++    - name: Add CommunityToolkit Labs NuGet source
++      run: |
++        dotnet nuget add source https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json --name CommunityToolkit-Labs
++      
++    - name: Restore NuGet packages
++      run: nuget restore $env:Solution_Name -Source "https://api.nuget.org/v3/index.json;https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json"
++      
++    - name: Restore dependencies
++      run: dotnet restore $env:Solution_Name
++    
++    - name: Build MSIX Package for ${{ matrix.platform }}
++      shell: pwsh
++      run: |
++        Write-Host "Building MSIX package for ${{ matrix.platform }}..."
++        
++        $platform = "${{ matrix.platform }}"
++        $appPackageDir = "$env:GITHUB_WORKSPACE\AppPackages\$platform\"
++        
++        msbuild Clippy\Clippy.csproj `
++          /t:Build,Publish `
++          /p:Configuration=$env:Configuration `
++          /p:Platform=$platform `
++          /p:UapAppxPackageBuildMode=SideloadOnly `
++          /p:AppxBundle=Never `
++          /p:AppxPackageDir="$appPackageDir" `
++          /p:AppxPackageSigningEnabled=false `
++          /p:GenerateAppxPackageOnBuild=true `
++          /verbosity:minimal
++          
++        if ($LASTEXITCODE -ne 0) {
++          Write-Host "Build failed with exit code $LASTEXITCODE"
++          exit $LASTEXITCODE
++        }
++        
++        Write-Host "Build completed successfully"
++      
++    - name: Find and prepare MSIX package
++      id: find_msix
++      shell: pwsh
++      run: |
++        $platform = "${{ matrix.platform }}"
++        Write-Host "Searching for MSIX package for $platform..."
++        
++        $msixFiles = Get-ChildItem -Path "AppPackages\$platform" -Recurse -Filter "*.msix" | Where-Object { $_.Name -notlike "*_Test*" }
++        
++        if ($msixFiles.Count -eq 0) {
++          Write-Host "No MSIX package found for $platform"
++          exit 1
++        }
++        
++        $msixFile = $msixFiles[0]
++        Write-Host "Found MSIX: $($msixFile.FullName)"
++        Write-Host "Size: $($msixFile.Length / 1MB) MB"
++        
++        # Create a clean filename for the release
++        $newName = "Clippy-$platform.msix"
++        $newPath = Join-Path $env:GITHUB_WORKSPACE $newName
++        Copy-Item $msixFile.FullName -Destination $newPath
++        
++        Write-Host "Copied to: $newPath"
++        
++        # Output for next step
++        "msix_path=$newPath" >> $env:GITHUB_OUTPUT
++        "msix_name=$newName" >> $env:GITHUB_OUTPUT
++      
++    - name: Upload MSIX to release
++      if: github.event_name == 'release' || github.event_name == 'push'
++      shell: pwsh
++      env:
++        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++      run: |
++        $msixPath = "${{ steps.find_msix.outputs.msix_path }}"
++        $msixName = "${{ steps.find_msix.outputs.msix_name }}"
++        
++        # Determine the tag name
++        if ("${{ github.event_name }}" -eq "release") {
++          $tag = "${{ github.event.release.tag_name }}"
++        } elseif ("${{ github.ref_type }}" -eq "tag") {
++          $tag = "${{ github.ref_name }}"
++        } else {
++          Write-Host "Not a release or tag event, skipping upload"
++          exit 0
++        }
++        
++        Write-Host "Uploading $msixName to release $tag..."
++        
++        # Check if release exists, if not create it
++        $releaseExists = gh release view $tag --repo rob1nzon/Clippy 2>&1
++        if ($LASTEXITCODE -ne 0) {
++          Write-Host "Release $tag does not exist, creating it..."
++          gh release create $tag --repo rob1nzon/Clippy --title $tag --notes "Release $tag"
++        }
++        
++        # Upload the asset
++        gh release upload $tag $msixPath --repo rob1nzon/Clippy --clobber
++        
++        Write-Host "✓ Successfully uploaded $msixName to release $tag"
++    
++    - name: Upload build artifacts (for workflow dispatch)
++      if: github.event_name == 'workflow_dispatch'
++      uses: actions/upload-artifact@v4
++      with:
++        name: Clippy-${{ matrix.platform }}-Release
++        path: ${{ steps.find_msix.outputs.msix_path }}
++        retention-days: 30
+-- 
+2.50.1
+
+
+From ad54f28b4ebe0e6d7427c78b5e69f16355619e79 Mon Sep 17 00:00:00 2001
+From: Roo Code <roomote@roocode.com>
+Date: Sat, 3 Jan 2026 22:21:56 +0000
+Subject: [PATCH 2/2] docs: add release workflow setup instructions
+
+---
+ RELEASE_WORKFLOW_SETUP.md | 109 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 109 insertions(+)
+ create mode 100644 RELEASE_WORKFLOW_SETUP.md
+
+diff --git a/RELEASE_WORKFLOW_SETUP.md b/RELEASE_WORKFLOW_SETUP.md
+new file mode 100644
+index 0000000..ae8c992
+--- /dev/null
++++ b/RELEASE_WORKFLOW_SETUP.md
+@@ -0,0 +1,109 @@
++# Release Workflow Setup Instructions
++
++## Problem
++The current release only contains source code and no build artifacts (MSIX packages).
++
++## Solution
++I've created a new release workflow that automatically builds and uploads MSIX packages for all platforms (x64, x86, arm64) when a release is created or a tag is pushed.
++
++## Changes Made
++
++### 1. New File: `.github/workflows/release.yml`
++This workflow:
++- Triggers on release creation, tag pushes, or manual dispatch
++- Builds MSIX packages for x64, x86, and arm64 platforms
++- Automatically uploads the packages to GitHub releases
++- Uses Release configuration for optimized builds
++
++### 2. Updated File: `.github/workflows/build.yml`
++Simplified to focus on CI testing:
++- Renamed to "CI Build"
++- Runs on PRs and pushes to main/master
++- Tests both Debug and Release configurations
++- No longer attempts to create releases
++
++## How to Apply These Changes
++
++Since the GitHub App doesn't have permission to modify workflow files, please manually apply these changes:
++
++### Option 1: Manual Application
++1. Copy the contents of `.github/workflows/release.yml` from this branch
++2. Create this file in your repository's main branch
++3. Copy the updated `.github/workflows/build.yml` 
++4. Replace the existing build.yml in your repository
++
++### Option 2: Merge This Branch with Administrator Privileges
++An administrator with workflow write permissions can:
++```bash
++git checkout main
++git merge release-workflow-fix
++git push origin main
++```
++
++## Testing the Release Workflow
++
++After applying the changes:
++
++### Option 1: Create a New Tag
++```bash
++git tag v1.0.0
++git push origin v1.0.0
++```
++
++### Option 2: Manually Trigger
++1. Go to Actions tab in GitHub
++2. Select "Build and Release" workflow
++3. Click "Run workflow"
++4. Enter a tag name
++
++### Option 3: Create a Release via GitHub UI
++1. Go to Releases page
++2. Click "Draft a new release"
++3. Create a new tag
++4. Publish the release
++
++The workflow will automatically build and upload:
++- `Clippy-x64.msix`
++- `Clippy-x86.msix`
++- `Clippy-arm64.msix`
++
++## Updating the Existing "new" Release
++
++To add build artifacts to the existing "new" release:
++
++```bash
++# Trigger the workflow manually for the "new" tag
++gh workflow run release.yml --repo rob1nzon/Clippy --ref new -f tag=new
++```
++
++Or delete and recreate the release:
++```bash
++# Delete the old release
++gh release delete new --repo rob1nzon/Clippy --yes
++
++# Create a new one (the workflow will build and upload artifacts)
++gh release create new --repo rob1nzon/Clippy --title "Clippy Release" --notes "Initial release with MSIX packages for all platforms"
++```
++
++## What Gets Built
++
++Each platform build includes:
++- MSIX package (unsigned, for sideloading)
++- All dependencies bundled
++- Optimized Release configuration
++- Ready for installation on Windows 10/11
++
++## Troubleshooting
++
++If builds fail:
++1. Check the Actions tab for detailed logs
++2. Ensure all NuGet packages are accessible
++3. Verify the Windows SDK version is available
++4. Check that the Tray patching is working correctly
++
++## Next Steps
++
++1. Apply the workflow files to the main branch
++2. Delete and recreate the "new" release to trigger builds
++3. Verify that MSIX packages are uploaded
++4. Test installation on target platforms
+-- 
+2.50.1
+
