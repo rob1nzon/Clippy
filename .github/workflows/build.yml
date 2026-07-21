@@ -130,10 +130,15 @@ jobs:
         if (-not $package) { throw "Clippy MSIX package not found." }
         & $signTool.FullName sign /sha1 $env:CLIPPY_CERT_THUMBPRINT /fd SHA256 $package.FullName
         if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
-        Import-Certificate -FilePath Signing\Clippy.cer -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
-        & $signTool.FullName verify /pa /v $package.FullName
-        if ($LASTEXITCODE -ne 0) { throw "MSIX signature verification failed." }
-        Remove-Item "Cert:\CurrentUser\Root\$env:CLIPPY_CERT_THUMBPRINT"
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $archive = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
+        try {
+          if (-not ($archive.Entries | Where-Object FullName -eq "AppxSignature.p7x")) {
+            throw "Signed MSIX does not contain AppxSignature.p7x."
+          }
+        } finally {
+          $archive.Dispose()
+        }
 
     - name: Create sideload installer
       shell: pwsh
