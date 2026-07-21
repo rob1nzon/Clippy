@@ -77,5 +77,27 @@ namespace Clippy.Services
                 SetProperty(ref keyboardEnabled, value);
             }
         }
+
+        private string openAIBaseUrl = (string)(Settings.Values["OpenAIBaseUrl"] ?? "http://localhost:1234/v1");
+        public string OpenAIBaseUrl
+        {
+            get => openAIBaseUrl;
+            set
+            {
+                Settings.Values["OpenAIBaseUrl"] = value;
+                SetProperty(ref openAIBaseUrl, value);
+            }
+        }
+
+        private string openAIModel = (string)(Settings.Values["OpenAIModel"] ?? "local-model");
+        public string OpenAIModel
+        {
+            get => openAIModel;
+            set
+            {
+                Settings.Values["OpenAIModel"] = value;
+                SetProperty(ref openAIModel, value);
+            }
+        }
     }
 }

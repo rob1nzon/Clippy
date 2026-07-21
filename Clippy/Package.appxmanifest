@@ -9,7 +9,7 @@
   <Identity
     Name="1d7f7310-4917-4b30-a798-43182fd07f5a"
     Publisher="CN=Dulu"
-    Version="1.0.0.0" />
+    Version="1.2.0.0" />
 
   <Properties>
     <DisplayName>Clippy</DisplayName>

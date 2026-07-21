@@ -1,111 +1,134 @@
-﻿using Clippy.Core.Classes;
-using OpenAI;
-using OpenAI.Managers;
-using OpenAI.ObjectModels;
-using OpenAI.ObjectModels.RequestModels;
+using Clippy.Core.Classes;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Clippy.Core.Services
 {
     public class ChatGPTService : IChatService
     {
-        private const string ClippyKey = "Hello there! To use this app you need a valid OpenAI API key. You can obtain one by visiting https://beta.openai.com/signup/ and following the instructions to create an account. Once you have an account, you can generate your API key and enter it into the API field in Settings then refreshing this chat dialog!";
-        private const string ClippyStart = "Hi! I'm Clippy, your Windows assistant. Would you like to get some assistance?";
-        private const string Instruction = "You are in an app that revives Microsoft Clippy in Windows. Speak in a Clippy style and try to stay as concise/short as possible and not output long messages.";
+        private const string ClippyStart = "Hi! I'm Clippy, your Windows assistant. Would you like some assistance?";
+        private const string Instruction = "You are Microsoft Clippy revived as a Windows assistant. Be helpful, concise, and speak in Clippy's friendly style.";
+        private static readonly HttpClient HttpClient = new HttpClient();
+
         public ObservableCollection<IMessage> Messages { get; } = new ObservableCollection<IMessage>();
 
-        private OpenAIService AI;
+        private readonly ISettingsService settings;
+        private readonly IKeyService keyService;
 
-        private ISettingsService Settings;
-        private IKeyService KeyService;
-
-        public ChatGPTService(ISettingsService settings, IKeyService keys)
+        public ChatGPTService(ISettingsService settings, IKeyService keyService)
         {
-            Settings = settings;
-            KeyService = keys;
-            if (SetAPI()) // Refresh API key
-                Add(new ClippyMessage(ClippyStart, true));
+            this.settings = settings;
+            this.keyService = keyService;
+            Refresh();
         }
-             
+
         public void Refresh()
         {
             Messages.Clear();
-            SetAPI();
-            if(SetAPI()) // Refresh API key
-                Add(new ClippyMessage(ClippyStart, true));
+            Add(new ClippyMessage(ClippyStart, true));
         }
 
-        public async Task SendAsync(IMessage message) /// Send a message
+        public async Task SendAsync(IMessage message)
         {
-            Add(message); // Send user message to UI
-            List<ChatMessage> GPTMessages = new List<ChatMessage>
+            Add(message);
+
+            var apiMessages = new List<object>
             {
-                ChatMessage.FromSystem(Instruction)
+                new { role = "system", content = Instruction }
             };
-            foreach (IMessage m in Messages) // Remove any editable message
+
+            foreach (var existingMessage in Messages)
             {
-                if (message is ClippyMessage)
-                    GPTMessages.Add(ChatMessage.FromAssistant(m.Message));
-                else
-                    GPTMessages.Add(ChatMessage.FromUser(m.Message));
+                if (string.IsNullOrWhiteSpace(existingMessage.Message))
+                    continue;
+
+                apiMessages.Add(new
+                {
+                    role = existingMessage is UserMessage ? "user" : "assistant",
+                    content = existingMessage.Message
+                });
             }
-            await Task.Delay(300);
-            ClippyMessage Response = new ClippyMessage(true);
-            Add(Response); // Send empty message and update text later to show preview UI
 
-            GPTMessages.Add(ChatMessage.FromUser(message.Message));
+            var responseMessage = new ClippyMessage(true);
+            Add(responseMessage);
 
-            var completionResult = await AI.ChatCompletion.CreateCompletion(new ChatCompletionCreateRequest
+            try
             {
-                Messages = GPTMessages,
-                Model = Models.ChatGpt3_5Turbo,
-                MaxTokens = Settings.Tokens,
-            });
+                var baseUrl = settings.OpenAIBaseUrl?.Trim().TrimEnd('/');
+                var model = settings.OpenAIModel?.Trim();
+                if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out _))
+                    throw new InvalidOperationException("Set a valid server URL in Settings.");
+                if (string.IsNullOrWhiteSpace(model))
+                    throw new InvalidOperationException("Set a model name in Settings.");
 
-            if (completionResult.Successful)
-            {
-                Response.Message = completionResult.Choices.First().Message.Content;
+                var endpoint = baseUrl.EndsWith("/chat/completions", StringComparison.OrdinalIgnoreCase)
+                    ? baseUrl
+                    : baseUrl + "/chat/completions";
+                var body = JsonSerializer.Serialize(new
+                {
+                    model,
+                    messages = apiMessages,
+                    max_tokens = settings.Tokens,
+                    stream = false
+                });
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+                {
+                    Content = new StringContent(body, Encoding.UTF8, "application/json")
+                };
+                var apiKey = keyService.GetKey()?.Trim();
+                if (!string.IsNullOrWhiteSpace(apiKey))
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+                using var response = await HttpClient.SendAsync(request);
+                var responseBody = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode)
+                    throw new HttpRequestException($"Server returned {(int)response.StatusCode}: {ReadError(responseBody)}");
+
+                using var document = JsonDocument.Parse(responseBody);
+                responseMessage.Message = document.RootElement
+                    .GetProperty("choices")[0]
+                    .GetProperty("message")
+                    .GetProperty("content")
+                    .GetString() ?? string.Empty;
             }
-            else
+            catch (Exception exception)
             {
-                Response.Message = $"Unfortunately an error occured `{completionResult.Error}`";
-                Response.IsLatest = false;
+                responseMessage.Message = $"Unable to chat: {exception.Message}";
+            }
+            finally
+            {
+                responseMessage.IsLatest = false;
             }
         }
 
-        private void Add(IMessage Message) /// Add a message
-        {
-            foreach(IMessage message in Messages) /// Remove any editable message
-            {
-                if (message is ClippyMessage)
-                    ((ClippyMessage)message).IsLatest = false;
-            }
-            Messages.Add(Message);
-        }
-
-        /// <summary>
-        /// Initialise the OpenAI API and refresh API key
-        /// </summary>
-        private bool SetAPI()
+        private static string ReadError(string responseBody)
         {
             try
             {
-                AI = new OpenAIService(new OpenAiOptions()
-                {
-                    ApiKey = KeyService.GetKey()
-                });
-                return true;
+                using var document = JsonDocument.Parse(responseBody);
+                return document.RootElement.GetProperty("error").GetProperty("message").GetString() ?? responseBody;
             }
             catch
             {
-                Add(new ClippyMessage(ClippyKey, false));
-                return false;
+                return responseBody;
             }
+        }
+
+        private void Add(IMessage message)
+        {
+            foreach (var existingMessage in Messages)
+            {
+                if (existingMessage is ClippyMessage clippyMessage)
+                    clippyMessage.IsLatest = false;
+            }
+            Messages.Add(message);
         }
     }
 }
