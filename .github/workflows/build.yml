@@ -97,34 +97,12 @@ jobs:
     - name: Build MSIX Package
       run: |
         msbuild Clippy\Clippy.csproj /t:Build,Publish /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxBundle=Never /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages\" /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true
-      continue-on-error: true
+      continue-on-error: false
       
-    - name: Find executables
-      run: |
-        Write-Host "Searching for EXE files..."
-        Get-ChildItem -Path . -Recurse -Filter "*.exe" | Select-Object FullName, Length, LastWriteTime
-        Write-Host "`nSearching in bin folders..."
-        Get-ChildItem -Path . -Recurse -Filter "bin" -Directory | ForEach-Object {
-          Write-Host "`nContents of $($_.FullName):"
-          Get-ChildItem -Path $_.FullName -Recurse | Select-Object FullName, Length
-        }
-      
-    - name: Upload build artifacts (if any)
+    - name: Upload MSIX package
       uses: actions/upload-artifact@v4
-      if: always()
       with:
-        name: Clippy-Build-${{ github.sha }}
-        path: |
-          **/bin/Debug/**
-          **/bin/x64/**
-          **/AppPackages/**
-        retention-days: 7
-
-    - name: Upload build logs
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: Build-Logs-${{ github.sha }}
-        path: |
-          **/*.log
+        name: Clippy-MSIX-${{ github.sha }}
+        path: AppPackages/**/*.msix
+        if-no-files-found: error
         retention-days: 7
