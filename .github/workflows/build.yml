@@ -21,8 +21,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        # Попробуем использовать конкретный коммит если master нестабилен
-        ref: master
         submodules: recursive  # На случай если есть подмодули
       
     - name: Check for Tray folder
@@ -72,7 +70,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: '9.0.x'
         
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
@@ -102,7 +100,7 @@ jobs:
       
     - name: Build main Clippy project
       run: msbuild Clippy\Clippy.csproj /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion /p:GenerateAppxPackageOnBuild=false /verbosity:detailed
-      continue-on-error: true  # Даже если не соберется, покажет детальную информацию
+      continue-on-error: false
     
     - name: Build MSIX Package
       run: |
