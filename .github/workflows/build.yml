@@ -77,14 +77,6 @@ jobs:
       with:
         msbuild-architecture: x64
     
-    - name: Add CommunityToolkit Labs NuGet source
-      run: |
-        dotnet nuget add source https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json --name CommunityToolkit-Labs
-      
-    - name: Restore NuGet packages
-      run: nuget restore $env:Solution_Name -Source "https://api.nuget.org/v3/index.json;https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json"
-      continue-on-error: false
-      
     - name: Restore dependencies
       run: dotnet restore $env:Solution_Name
       continue-on-error: false
