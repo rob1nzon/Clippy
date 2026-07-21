@@ -21,15 +21,15 @@ namespace Clippy.Services
     /// </summary>
     public sealed class ChatService : IChatService
     {
-        private const string ResponsesEndpoint = "https://api.openai.com/v1/responses";
-        private const string Model = "gpt-5-mini";
         private static readonly HttpClient HttpClient = new HttpClient();
 
         private readonly IKeyService keyService;
+        private readonly ISettingsService settingsService;
 
-        public ChatService(IKeyService keyService)
+        public ChatService(IKeyService keyService, ISettingsService settingsService)
         {
             this.keyService = keyService ?? throw new ArgumentNullException(nameof(keyService));
+            this.settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         }
 
         public async Task<string> SendChatAsync(IEnumerable<IMessage> messages)
@@ -39,7 +39,7 @@ namespace Clippy.Services
             var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
 
             EnsureSuccess(response.StatusCode, responseBody);
-            return ReadOutputText(responseBody);
+            return ReadChatCompletionText(responseBody);
         }
 
         public async IAsyncEnumerable<string> StreamChatAsync(
@@ -76,24 +76,18 @@ namespace Clippy.Services
                 using var document = JsonDocument.Parse(data);
                 var root = document.RootElement;
 
-                if (!root.TryGetProperty("type", out var typeElement))
-                    continue;
-
-                var eventType = typeElement.GetString();
-                if (eventType == "response.output_text.delta" &&
-                    root.TryGetProperty("delta", out var deltaElement))
+                if (root.TryGetProperty("choices", out var choices) &&
+                    choices.GetArrayLength() > 0 &&
+                    choices[0].TryGetProperty("delta", out var deltaObject) &&
+                    deltaObject.TryGetProperty("content", out var deltaElement))
                 {
                     var delta = deltaElement.GetString();
                     if (!string.IsNullOrEmpty(delta))
                         yield return delta;
                 }
-                else if (eventType == "error")
+                else if (root.TryGetProperty("error", out _))
                 {
                     throw new InvalidOperationException(ReadErrorMessage(root));
-                }
-                else if (eventType == "response.failed")
-                {
-                    throw new InvalidOperationException(ReadResponseFailure(root));
                 }
             }
         }
@@ -104,8 +98,12 @@ namespace Clippy.Services
                 throw new ArgumentNullException(nameof(messages));
 
             var apiKey = keyService.GetKey()?.Trim();
-            if (string.IsNullOrWhiteSpace(apiKey))
-                throw new InvalidOperationException("Add your OpenAI API key in Clippy settings first.");
+            var baseUrl = settingsService.OpenAIBaseUrl?.Trim().TrimEnd('/');
+            var model = settingsService.OpenAIModel?.Trim();
+            if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var endpoint))
+                throw new InvalidOperationException("Set a valid OpenAI-compatible Base URL in Clippy settings.");
+            if (string.IsNullOrWhiteSpace(model))
+                throw new InvalidOperationException("Set a model name in Clippy settings.");
 
             var input = messages.Select(message => new
             {
@@ -115,16 +113,17 @@ namespace Clippy.Services
 
             var body = JsonSerializer.Serialize(new
             {
-                model = Model,
-                input,
+                model,
+                messages = input,
                 stream
             });
 
-            var request = new HttpRequestMessage(HttpMethod.Post, ResponsesEndpoint)
+            var request = new HttpRequestMessage(HttpMethod.Post, baseUrl + "/chat/completions")
             {
                 Content = new StringContent(body, Encoding.UTF8, "application/json")
             };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            if (!string.IsNullOrWhiteSpace(apiKey))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             return request;
         }
 
@@ -136,33 +135,17 @@ namespace Clippy.Services
             _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Unsupported chat role.")
         };
 
-        private static string ReadOutputText(string responseBody)
+        private static string ReadChatCompletionText(string responseBody)
         {
             using var document = JsonDocument.Parse(responseBody);
-            if (!document.RootElement.TryGetProperty("output", out var output))
-                throw new InvalidOperationException("OpenAI returned no output.");
+            var root = document.RootElement;
+            if (root.TryGetProperty("choices", out var choices) &&
+                choices.GetArrayLength() > 0 &&
+                choices[0].TryGetProperty("message", out var message) &&
+                message.TryGetProperty("content", out var content))
+                return content.GetString() ?? string.Empty;
 
-            var text = new StringBuilder();
-            foreach (var item in output.EnumerateArray())
-            {
-                if (!item.TryGetProperty("content", out var content))
-                    continue;
-
-                foreach (var part in content.EnumerateArray())
-                {
-                    if (part.TryGetProperty("type", out var type) &&
-                        type.GetString() == "output_text" &&
-                        part.TryGetProperty("text", out var value))
-                    {
-                        text.Append(value.GetString());
-                    }
-                }
-            }
-
-            if (text.Length == 0)
-                throw new InvalidOperationException("OpenAI returned no text output.");
-
-            return text.ToString();
+            throw new InvalidOperationException("The server returned no chat completion text.");
         }
 
         private static void EnsureSuccess(HttpStatusCode statusCode, string responseBody)
@@ -207,17 +190,5 @@ namespace Clippy.Services
             return "OpenAI streaming error.";
         }
 
-        private static string ReadResponseFailure(JsonElement root)
-        {
-            if (root.TryGetProperty("response", out var response) &&
-                response.TryGetProperty("error", out var error) &&
-                error.ValueKind != JsonValueKind.Null &&
-                error.TryGetProperty("message", out var message))
-            {
-                return message.GetString() ?? "OpenAI response failed.";
-            }
-
-            return "OpenAI response failed.";
-        }
     }
 }

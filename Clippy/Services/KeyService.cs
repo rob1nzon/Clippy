@@ -27,6 +27,18 @@ namespace Clippy.Services
             }
         }
 
-        public void SetKey(string key) => Vault.Add(new PasswordCredential(Resource, Name, key));
+        public void SetKey(string key)
+        {
+            try
+            {
+                Vault.Remove(Vault.Retrieve(Resource, Name));
+            }
+            catch
+            {
+            }
+
+            if (!string.IsNullOrWhiteSpace(key))
+                Vault.Add(new PasswordCredential(Resource, Name, key));
+        }
     }
 }
