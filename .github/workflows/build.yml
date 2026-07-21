@@ -21,8 +21,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        # Попробуем использовать конкретный коммит если master нестабилен
-        ref: master
         submodules: recursive  # На случай если есть подмодули
       
     - name: Check for Tray folder
@@ -72,21 +70,13 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x'
+        dotnet-version: '9.0.x'
         
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
       with:
         msbuild-architecture: x64
     
-    - name: Add CommunityToolkit Labs NuGet source
-      run: |
-        dotnet nuget add source https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json --name CommunityToolkit-Labs
-      
-    - name: Restore NuGet packages
-      run: nuget restore $env:Solution_Name -Source "https://api.nuget.org/v3/index.json;https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json"
-      continue-on-error: false
-      
     - name: Restore dependencies
       run: dotnet restore $env:Solution_Name
       continue-on-error: false
@@ -102,39 +92,88 @@ jobs:
       
     - name: Build main Clippy project
       run: msbuild Clippy\Clippy.csproj /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion /p:GenerateAppxPackageOnBuild=false /verbosity:detailed
-      continue-on-error: true  # Даже если не соберется, покажет детальную информацию
+      continue-on-error: false
+
+    - name: Create package signing certificate
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path Signing | Out-Null
+        $password = ConvertTo-SecureString "ClippyActionsTemporaryPassword" -AsPlainText -Force
+        $certificate = New-SelfSignedCertificate `
+          -Type Custom `
+          -Subject "CN=3C7C8FC9-7104-4B33-8730-EE1E929D5D3B" `
+          -FriendlyName "Clippy sideload package" `
+          -CertStoreLocation "Cert:\CurrentUser\My" `
+          -KeyExportPolicy Exportable `
+          -KeyUsage DigitalSignature `
+          -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3") `
+          -NotAfter (Get-Date).AddYears(2)
+        Export-PfxCertificate -Cert $certificate -FilePath Signing\Clippy.pfx -Password $password | Out-Null
+        Export-Certificate -Cert $certificate -FilePath Signing\Clippy.cer | Out-Null
+        "CLIPPY_CERT_THUMBPRINT=$($certificate.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append
     
     - name: Build MSIX Package
       run: |
         msbuild Clippy\Clippy.csproj /t:Build,Publish /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxBundle=Never /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages\" /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true
-      continue-on-error: true
-      
-    - name: Find executables
-      run: |
-        Write-Host "Searching for EXE files..."
-        Get-ChildItem -Path . -Recurse -Filter "*.exe" | Select-Object FullName, Length, LastWriteTime
-        Write-Host "`nSearching in bin folders..."
-        Get-ChildItem -Path . -Recurse -Filter "bin" -Directory | ForEach-Object {
-          Write-Host "`nContents of $($_.FullName):"
-          Get-ChildItem -Path $_.FullName -Recurse | Select-Object FullName, Length
-        }
-      
-    - name: Upload build artifacts (if any)
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: Clippy-Build-${{ github.sha }}
-        path: |
-          **/bin/Debug/**
-          **/bin/x64/**
-          **/AppPackages/**
-        retention-days: 7
+      continue-on-error: false
 
-    - name: Upload build logs
+    - name: Sign MSIX package
+      shell: pwsh
+      run: |
+        $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+          Sort-Object FullName -Descending |
+          Select-Object -First 1
+        if (-not $signTool) { throw "SignTool.exe not found." }
+        $package = Get-ChildItem AppPackages -Recurse -Filter "Clippy_*.msix" |
+          Where-Object { $_.FullName -notmatch "\\Dependencies\\" } |
+          Select-Object -First 1
+        if (-not $package) { throw "Clippy MSIX package not found." }
+        & $signTool.FullName sign /sha1 $env:CLIPPY_CERT_THUMBPRINT /fd SHA256 $package.FullName
+        if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $archive = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
+        try {
+          if (-not ($archive.Entries | Where-Object FullName -eq "AppxSignature.p7x")) {
+            throw "Signed MSIX does not contain AppxSignature.p7x."
+          }
+        } finally {
+          $archive.Dispose()
+        }
+
+    - name: Create sideload installer
+      shell: pwsh
+      run: |
+        @'
+        $ErrorActionPreference = "Stop"
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+        if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+          Start-Process powershell.exe -Verb RunAs -ArgumentList "-ExecutionPolicy Bypass -File `"$PSCommandPath`""
+          exit
+        }
+        $signingDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
+        $root = Split-Path -Parent $signingDirectory
+        $certificate = Join-Path $signingDirectory "Clippy.cer"
+        $package = Get-ChildItem -Path $root -Recurse -Filter "Clippy_*.msix" |
+          Where-Object { $_.FullName -notmatch "\\Dependencies\\" } |
+          Select-Object -First 1
+        if (-not $package) { throw "Clippy MSIX package not found." }
+
+        Import-Certificate -FilePath $certificate -CertStoreLocation "Cert:\LocalMachine\TrustedPeople" | Out-Null
+        Get-ChildItem -Path $root -Recurse -Filter "*.msix" |
+          Where-Object { $_.FullName -match "\\Dependencies\\" } |
+          ForEach-Object { Add-AppxPackage -Path $_.FullName }
+        Add-AppxPackage -Path $package.FullName
+        Write-Host "Clippy installed successfully."
+        '@ | Set-Content -Path Signing\Install.ps1
+      
+    - name: Upload signed MSIX package
       uses: actions/upload-artifact@v4
-      if: always()
       with:
-        name: Build-Logs-${{ github.sha }}
+        name: Clippy-MSIX-${{ github.sha }}
         path: |
-          **/*.log
+          AppPackages/**/*.msix
+          Signing/Clippy.cer
+          Signing/Install.ps1
+        if-no-files-found: error
         retention-days: 7

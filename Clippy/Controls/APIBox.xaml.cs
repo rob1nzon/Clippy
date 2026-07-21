@@ -26,27 +26,30 @@ namespace Clippy.Controls
     public sealed partial class APIBox : UserControl
     {
         private KeyService Keys = (KeyService)App.Current.Services.GetService<IKeyService>();
+        private SettingsService Settings = (SettingsService)App.Current.Services.GetService<ISettingsService>();
 
         public APIBox()
         {
             this.InitializeComponent();
             KeyBox.Password = Keys.GetKey();
+            BaseUrlBox.Text = Settings.OpenAIBaseUrl;
+            ModelBox.Text = Settings.OpenAIModel;
         }
 
         private void AddApi()
         {
-            if (string.IsNullOrEmpty(KeyBox.Password))
+            if (!Uri.TryCreate(BaseUrlBox.Text, UriKind.Absolute, out _) ||
+                string.IsNullOrWhiteSpace(ModelBox.Text))
             {
                 Reject();
                 return;
             }
             try
             {
-               /* OpenAIService AI = new OpenAIService(new OpenAiOptions()
-                {
-                    ApiKey = KeyBox.Password
-                });*/
                 Keys.SetKey(KeyBox.Password);
+                Settings.OpenAIBaseUrl = BaseUrlBox.Text.Trim().TrimEnd('/');
+                Settings.OpenAIModel = ModelBox.Text.Trim();
+                Accept();
             }
             catch
             {

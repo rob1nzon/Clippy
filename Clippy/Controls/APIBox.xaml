@@ -258,9 +258,12 @@
             </Setter>
         </Style>
     </UserControl.Resources>
-    <StackPanel Orientation="Horizontal" Spacing="12">
-        <toolkit:DropShadowPanel ShadowOpacity="0.4" OffsetX="4" CornerRadius="8" Margin="0, 12, 0, 16" OffsetY="4">
-            <PasswordBox x:Name="KeyBox" Width="340" PasswordRevealMode="{x:Bind PrivacyToPassword(PasswordVisbility.IsChecked), Mode=OneWay}" PlaceholderText="Enter your OpenAI Api key here..." KeyDown="ApiBox_KeyDown" Style="{ThemeResource KeyGlowPasswordBoxStyle}">
+    <StackPanel Spacing="8" Margin="0,12,0,16">
+        <TextBox x:Name="BaseUrlBox" Header="Server URL" PlaceholderText="http://localhost:1234/v1" Description="LM Studio: http://localhost:1234/v1 · Ollama: http://localhost:11434/v1"/>
+        <TextBox x:Name="ModelBox" Header="Model name" PlaceholderText="local-model" Description="Exact model identifier exposed by the server"/>
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <toolkit:DropShadowPanel ShadowOpacity="0.4" OffsetX="4" CornerRadius="8" OffsetY="4">
+            <PasswordBox x:Name="KeyBox" Width="340" PasswordRevealMode="{x:Bind PrivacyToPassword(PasswordVisbility.IsChecked), Mode=OneWay}" PlaceholderText="API key (optional)" KeyDown="ApiBox_KeyDown" Style="{ThemeResource KeyGlowPasswordBoxStyle}">
                 <ani:Explicit.Animations>
                     <ani:AnimationSet x:Name="PasswordLoadAnimation" IsSequential="True">
                         <ani:OffsetAnimation From="0" To="8,0,0" Duration="0:0:0.0625"/>
@@ -272,12 +275,13 @@
                     </ani:AnimationSet>
                 </ani:Explicit.Animations>
             </PasswordBox>
-        </toolkit:DropShadowPanel>
-        <ToggleButton x:Name="PasswordVisbility" Style="{ThemeResource ToolbarToggleButton}" IsChecked="False" Height="32">
+          </toolkit:DropShadowPanel>
+          <ToggleButton x:Name="PasswordVisbility" Style="{ThemeResource ToolbarToggleButton}" IsChecked="False" Height="32">
             <Icons:FluentSymbolIcon Symbol="{x:Bind PrivacyToIcon(PasswordVisbility.IsChecked), Mode=OneWay}" Foreground="{ThemeResource HvidSortBrush}"/>
-        </ToggleButton>
-        <Button Click="Submit_Click" Style="{ThemeResource ToolbarButton}" Height="32">
+          </ToggleButton>
+          <Button Click="Submit_Click" Style="{ThemeResource ToolbarButton}" Height="32">
             <Icons:FluentSymbolIcon Symbol="Save20"/>
-        </Button>
+          </Button>
+        </StackPanel>
     </StackPanel>
 </UserControl>

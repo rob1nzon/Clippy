@@ -22,7 +22,7 @@ using Clippy.Services;
 using System.Threading.Tasks;
 using System.Runtime.ExceptionServices;
 using WinUIEx;
-using Clippy.Tray;
+// using Clippy.Tray; // Removed: Tray functionality not implemented
 using System.Threading;
 
 // To learn more about WinUI, the WinUI project structure,
@@ -90,12 +90,12 @@ namespace Clippy
         /// <param name="args">Details about the launch request and process.</param>
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
-			if (AppInstance.GetActivatedEventArgs().Kind != ActivationKind.StartupTask)
-			{
+   if (AppInstance.GetActivatedEventArgs().Kind != ActivationKind.StartupTask)
+   {
                ShowClippy();
-			}
+   }
 
-            TrayWindow = new TrayFlyoutWindow();
+            // TrayWindow = new TrayFlyoutWindow(); // Removed: Tray functionality not implemented
         }
 
         public void ShowClippy()
@@ -116,9 +116,9 @@ namespace Clippy
 
         private MainWindow m_window;
 
-		private Window s_window;
+  private Window s_window;
 
-        private TrayFlyoutWindow TrayWindow;
+        // private TrayFlyoutWindow TrayWindow; // Removed: Tray functionality not implemented
 
 		private static void OnUnobservedException(object? sender, UnobservedTaskExceptionEventArgs e) => e.SetObserved();
 
