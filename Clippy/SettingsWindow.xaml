@@ -52,15 +52,11 @@
                         <TextBlock FontSize="20" Opacity="0.7" FontWeight="SemiBold" VerticalAlignment="Bottom"> - 1.0</TextBlock>
                     </StackPanel>
                     <TextBlock FontSize="14" FontWeight="SemiBold" Margin="4, 4, 4, 2">AI Provider</TextBlock>
-                    <settings:SettingsBlockControl Title="OpenAI-compatible server" Margin="2" Description="Configure LM Studio, Ollama, llama.cpp, or another compatible endpoint">
+                    <settings:SettingsBlockControl Title="AI server and model" Margin="2" Description="Choose the OpenAI-compatible server URL and model used by Clippy">
                         <settings:SettingsBlockControl.Icon>
                             <icons:FluentIconElement VerticalAlignment="Center" Symbol="Key24" Foreground="LightCoral"/>
                         </settings:SettingsBlockControl.Icon>
-                        <settings:SettingsBlockControl.ExpandableContent>
-                            <Grid Padding="24, 0, 24, 0">
-                                <controls:APIBox/>
-                            </Grid>
-                        </settings:SettingsBlockControl.ExpandableContent>
+                        <controls:APIBox Margin="24,0,24,0"/>
                     </settings:SettingsBlockControl>
                     <TextBlock FontSize="14" FontWeight="SemiBold" Margin="4, 28, 4, 2">Clippy Options</TextBlock>
                    <!-- <settings:SettingsBlockControl Title="Maximum tokens" Margin="2" Description="Maximum amount of tokens to use for Clippy input + output per prompt. (1 token = 2-3 words)">

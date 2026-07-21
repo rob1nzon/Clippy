@@ -259,8 +259,8 @@
         </Style>
     </UserControl.Resources>
     <StackPanel Spacing="8" Margin="0,12,0,16">
-        <TextBox x:Name="BaseUrlBox" Header="Base URL" PlaceholderText="http://localhost:1234/v1"/>
-        <TextBox x:Name="ModelBox" Header="Model" PlaceholderText="local-model"/>
+        <TextBox x:Name="BaseUrlBox" Header="Server URL" PlaceholderText="http://localhost:1234/v1" Description="LM Studio: http://localhost:1234/v1 · Ollama: http://localhost:11434/v1"/>
+        <TextBox x:Name="ModelBox" Header="Model name" PlaceholderText="local-model" Description="Exact model identifier exposed by the server"/>
         <StackPanel Orientation="Horizontal" Spacing="12">
           <toolkit:DropShadowPanel ShadowOpacity="0.4" OffsetX="4" CornerRadius="8" OffsetY="4">
             <PasswordBox x:Name="KeyBox" Width="340" PasswordRevealMode="{x:Bind PrivacyToPassword(PasswordVisbility.IsChecked), Mode=OneWay}" PlaceholderText="API key (optional)" KeyDown="ApiBox_KeyDown" Style="{ThemeResource KeyGlowPasswordBoxStyle}">
