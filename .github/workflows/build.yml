@@ -130,6 +130,7 @@ jobs:
         if (-not $package) { throw "Clippy MSIX package not found." }
         & $signTool.FullName sign /sha1 $env:CLIPPY_CERT_THUMBPRINT /fd SHA256 $package.FullName
         if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
+        Import-Certificate -FilePath Signing\Clippy.cer -CertStoreLocation "Cert:\CurrentUser\TrustedPeople" | Out-Null
         & $signTool.FullName verify /pa /v $package.FullName
         if ($LASTEXITCODE -ne 0) { throw "MSIX signature verification failed." }
 
