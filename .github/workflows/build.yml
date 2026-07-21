@@ -49,20 +49,15 @@ jobs:
     - name: Build MSIX
       shell: pwsh
       run: |
-        msbuild Clippy\Clippy.csproj /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages\" /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true
+        msbuild Clippy\Clippy.csproj /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages\" /p:AppxPackageSigningEnabled=true /p:PackageCertificateThumbprint=$env:CLIPPY_CERT_THUMBPRINT /p:GenerateAppxPackageOnBuild=true
 
-    - name: Sign MSIX
+    - name: Validate MSIX signature
       shell: pwsh
       run: |
-        $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
-          Sort-Object FullName -Descending |
-          Select-Object -First 1
         $package = Get-ChildItem AppPackages -Recurse -Filter "Clippy_*.msix" |
           Where-Object { $_.FullName -notmatch "\\Dependencies\\" } |
           Select-Object -First 1
-        if (-not $signTool -or -not $package) { throw "SignTool or Clippy MSIX not found." }
-        & $signTool.FullName sign /sha1 $env:CLIPPY_CERT_THUMBPRINT /fd SHA256 $package.FullName
-        if ($LASTEXITCODE -ne 0) { throw "SignTool failed with exit code $LASTEXITCODE." }
+        if (-not $package) { throw "Clippy MSIX not found." }
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         $archive = [System.IO.Compression.ZipFile]::OpenRead($package.FullName)
         try {
