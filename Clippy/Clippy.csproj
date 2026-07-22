@@ -47,11 +47,17 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Windows.CsWinRT" Version="2.0.2" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.4.240802001" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.4.240802001" GeneratePathProperty="true" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.756" />
     <PackageReference Include="Microsoft.Xaml.Behaviors.WinUI.Managed" Version="2.0.9" />
     <PackageReference Include="WindowsInput" Version="6.4.1" />
     <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.WinUI">
+      <HintPath>$(PkgMicrosoft_WindowsAppSDK)\lib\net6.0-windows10.0.18362.0\Microsoft.WinUI.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
 
   <!-- Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
