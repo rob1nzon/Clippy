@@ -51,6 +51,32 @@ jobs:
       run: |
         msbuild Clippy\Clippy.csproj /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages\" /p:AppxPackageSigningEnabled=true /p:PackageCertificateThumbprint=$env:CLIPPY_CERT_THUMBPRINT /p:GenerateAppxPackageOnBuild=true
 
+    - name: Patch packaged dependency graph
+      shell: pwsh
+      run: |
+        $package = Get-ChildItem AppPackages -Recurse -Filter "Clippy_*.msix" |
+          Where-Object { $_.FullName -notmatch "\\Dependencies\\" } |
+          Select-Object -First 1
+        if (-not $package) { throw "Clippy MSIX not found." }
+
+        $sdkBin = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Directory |
+          Sort-Object Name -Descending |
+          Where-Object { Test-Path (Join-Path $_.FullName "x64\makeappx.exe") } |
+          Select-Object -First 1
+        if (-not $sdkBin) { throw "Windows SDK packaging tools not found." }
+
+        $makeAppx = Join-Path $sdkBin.FullName "x64\makeappx.exe"
+        $signTool = Join-Path $sdkBin.FullName "x64\signtool.exe"
+        $unpacked = Join-Path $env:RUNNER_TEMP "ClippyUnpacked"
+
+        & $makeAppx unpack /p $package.FullName /d $unpacked /o
+        Remove-Item (Join-Path $unpacked "AppxSignature.p7x") -Force -ErrorAction SilentlyContinue
+        Remove-Item (Join-Path $unpacked "AppxBlockMap.xml") -Force -ErrorAction SilentlyContinue
+        & .\Clippy\Build\AddWinUIToDeps.ps1 -DepsPath (Join-Path $unpacked "Clippy.deps.json")
+        Remove-Item $package.FullName -Force
+        & $makeAppx pack /d $unpacked /p $package.FullName /o
+        & $signTool sign /sha1 $env:CLIPPY_CERT_THUMBPRINT /fd SHA256 $package.FullName
+
     - name: Validate MSIX signature
       shell: pwsh
       run: |
