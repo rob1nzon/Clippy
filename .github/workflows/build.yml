@@ -73,6 +73,12 @@ jobs:
           if (-not ($archive.Entries | Where-Object FullName -eq "Microsoft.WindowsAppRuntime.dll")) {
             throw "Self-contained Windows App Runtime is missing from MSIX."
           }
+          $depsEntry = $archive.Entries | Where-Object FullName -eq "Clippy.deps.json"
+          $reader = [System.IO.StreamReader]::new($depsEntry.Open())
+          try { $deps = $reader.ReadToEnd() } finally { $reader.Dispose() }
+          if ($deps -notmatch 'Microsoft.WinUI.dll') {
+            throw "Clippy.deps.json cannot resolve Microsoft.WinUI.dll."
+          }
         } finally {
           $archive.Dispose()
         }
