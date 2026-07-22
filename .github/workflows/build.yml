@@ -105,7 +105,7 @@ jobs:
         $root = Split-Path -Parent $signingDirectory
         Import-Certificate -FilePath (Join-Path $signingDirectory "Clippy.cer") -CertStoreLocation "Cert:\LocalMachine\TrustedPeople" | Out-Null
         Get-ChildItem $root -Recurse -Filter "*.msix" |
-          Where-Object { $_.FullName -match "\\Dependencies\\" } |
+          Where-Object { $_.FullName -match "\\AppPackages\\Dependencies\\x64\\" } |
           ForEach-Object { Add-AppxPackage -Path $_.FullName }
         $package = Get-ChildItem $root -Recurse -Filter "Clippy_*.msix" |
           Where-Object { $_.FullName -notmatch "\\Dependencies\\" } |
