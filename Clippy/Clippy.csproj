@@ -59,6 +59,9 @@
       <Private>true</Private>
     </Reference>
   </ItemGroup>
+  <Target Name="AddWinUIToDepsFile" AfterTargets="GenerateBuildDependencyFile">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Build\AddWinUIToDeps.ps1&quot; -DepsPath &quot;$(ProjectDepsFilePath)&quot;" />
+  </Target>
 
   <!-- Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
        Tools extension to be activated for this project even if the Windows App SDK Nuget
