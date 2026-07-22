@@ -59,7 +59,7 @@
       <Private>true</Private>
     </Reference>
   </ItemGroup>
-  <Target Name="AddWinUIToDepsFile" AfterTargets="GenerateBuildDependencyFile">
+  <Target Name="AddWinUIToDepsFile" AfterTargets="CopyFilesToOutputDirectory">
     <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Build\AddWinUIToDeps.ps1&quot; -DepsPath &quot;$(ProjectDepsFilePath)&quot;" />
   </Target>
 
