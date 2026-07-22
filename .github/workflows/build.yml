@@ -64,6 +64,15 @@ jobs:
           if (-not ($archive.Entries | Where-Object FullName -eq "AppxSignature.p7x")) {
             throw "Signed MSIX does not contain AppxSignature.p7x."
           }
+          $manifestEntry = $archive.Entries | Where-Object FullName -eq "AppxManifest.xml"
+          $reader = [System.IO.StreamReader]::new($manifestEntry.Open())
+          try { $manifest = $reader.ReadToEnd() } finally { $reader.Dispose() }
+          if ($manifest -match "<PackageDependency") {
+            throw "MSIX still depends on an external Windows App Runtime package."
+          }
+          if (-not ($archive.Entries | Where-Object FullName -eq "Microsoft.WindowsAppRuntime.dll")) {
+            throw "Self-contained Windows App Runtime is missing from MSIX."
+          }
         } finally {
           $archive.Dispose()
         }
