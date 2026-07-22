@@ -51,31 +51,17 @@ jobs:
       run: |
         msbuild Clippy\Clippy.csproj /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages\" /p:AppxPackageSigningEnabled=true /p:PackageCertificateThumbprint=$env:CLIPPY_CERT_THUMBPRINT /p:GenerateAppxPackageOnBuild=true
 
-    - name: Patch packaged dependency graph
+    - name: Collect Windows App Runtime dependencies
       shell: pwsh
       run: |
-        $package = Get-ChildItem AppPackages -Recurse -Filter "Clippy_*.msix" |
-          Where-Object { $_.FullName -notmatch "\\Dependencies\\" } |
-          Select-Object -First 1
-        if (-not $package) { throw "Clippy MSIX not found." }
-
-        $sdkBin = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Directory |
-          Sort-Object Name -Descending |
-          Where-Object { Test-Path (Join-Path $_.FullName "x64\makeappx.exe") } |
-          Select-Object -First 1
-        if (-not $sdkBin) { throw "Windows SDK packaging tools not found." }
-
-        $makeAppx = Join-Path $sdkBin.FullName "x64\makeappx.exe"
-        $signTool = Join-Path $sdkBin.FullName "x64\signtool.exe"
-        $unpacked = Join-Path $env:RUNNER_TEMP "ClippyUnpacked"
-
-        & $makeAppx unpack /p $package.FullName /d $unpacked /o
-        Remove-Item (Join-Path $unpacked "AppxSignature.p7x") -Force -ErrorAction SilentlyContinue
-        Remove-Item (Join-Path $unpacked "AppxBlockMap.xml") -Force -ErrorAction SilentlyContinue
-        & .\Clippy\Build\AddWinUIToDeps.ps1 -DepsPath (Join-Path $unpacked "Clippy.deps.json")
-        Remove-Item $package.FullName -Force
-        & $makeAppx pack /d $unpacked /p $package.FullName /o
-        & $signTool sign /sha1 $env:CLIPPY_CERT_THUMBPRINT /fd SHA256 $package.FullName
+        $runtimeSource = Join-Path $env:USERPROFILE ".nuget\packages\microsoft.windowsappsdk\1.4.230518007-experimental1\tools\MSIX\win10-x64"
+        $runtimeTarget = Join-Path $env:GITHUB_WORKSPACE "AppPackages\Dependencies\x64"
+        $runtimePackages = Get-ChildItem $runtimeSource -Filter "*.msix"
+        if ($runtimePackages.Count -ne 4) {
+          throw "Expected four Windows App Runtime packages, found $($runtimePackages.Count)."
+        }
+        New-Item -ItemType Directory -Force -Path $runtimeTarget | Out-Null
+        Copy-Item $runtimePackages.FullName -Destination $runtimeTarget
 
     - name: Validate MSIX signature
       shell: pwsh
@@ -93,20 +79,15 @@ jobs:
           $manifestEntry = $archive.Entries | Where-Object FullName -eq "AppxManifest.xml"
           $reader = [System.IO.StreamReader]::new($manifestEntry.Open())
           try { $manifest = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          if ($manifest -match "<PackageDependency") {
-            throw "MSIX still depends on an external Windows App Runtime package."
-          }
-          if (-not ($archive.Entries | Where-Object FullName -eq "Microsoft.WindowsAppRuntime.dll")) {
-            throw "Self-contained Windows App Runtime is missing from MSIX."
-          }
-          $depsEntry = $archive.Entries | Where-Object FullName -eq "Clippy.deps.json"
-          $reader = [System.IO.StreamReader]::new($depsEntry.Open())
-          try { $deps = $reader.ReadToEnd() } finally { $reader.Dispose() }
-          if ($deps -notmatch 'Microsoft.WinUI.dll') {
-            throw "Clippy.deps.json cannot resolve Microsoft.WinUI.dll."
+          if ($manifest -notmatch 'PackageDependency Name="Microsoft.WindowsAppRuntime.1.4-experimental1"') {
+            throw "Expected Windows App Runtime dependency is missing from manifest."
           }
         } finally {
           $archive.Dispose()
+        }
+        $runtimePackages = Get-ChildItem AppPackages\Dependencies\x64 -Filter "*.msix"
+        if ($runtimePackages.Count -ne 4) {
+          throw "Runtime dependency set is incomplete."
         }
 
     - name: Create installer
