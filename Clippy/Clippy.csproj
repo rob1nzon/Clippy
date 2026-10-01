@@ -84,7 +84,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Clippy.Core\Clippy.Core.csproj" />
-    <ProjectReference Include="..\CubeKit.UI\CubeKit.UI.csproj" />
+    <ProjectReference Include="..\CubeKit.UI\CubeKit.UI.csproj" GlobalPropertiesToRemove="WindowsAppSDKSelfContained;SelfContained" />
   </ItemGroup>
   <ItemGroup>
     <None Update="Assets\Clippy\Clippy.png">

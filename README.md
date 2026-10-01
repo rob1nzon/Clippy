@@ -68,7 +68,7 @@ build tools, .NET 9 SDK, and Windows SDK 10.0.22621.0 or newer. In a Developer
 PowerShell from the repository directory:
 
 ```powershell
-msbuild Clippy\Clippy.csproj /restore /t:Publish /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifier=win-x64 /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true /p:SelfContained=true /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=false /p:PublishDir="$PWD\artifacts\Clippy-win-x64\"
+msbuild Clippy\Clippy.csproj /restore /t:Publish /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifier=win-x64 /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=false /p:PublishDir="$PWD\artifacts\Clippy-win-x64\"
 ```
 
 This WinUI app must be built on Windows. The portable version has no tray integration;
@@ -82,5 +82,4 @@ All Rights Reserved</h6>
 <p align="center">
 	<a href="https://github.com/FireCubeStudios/Clippy/blob/master/LICENSE.txt"><img src="https://img.shields.io/static/v1.svg?style=for-the-badge&label=License&message=MIT&logoColor=d9e0ee&colorA=363a4f&colorB=b7bdf8"/></a>
 </p>
-
 

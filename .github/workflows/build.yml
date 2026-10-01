@@ -27,7 +27,6 @@ jobs:
         run: >-
           msbuild Clippy\Clippy.csproj /restore /t:Publish
           /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifier=win-x64
-          /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true /p:SelfContained=true
           /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=false
           /p:PublishDir=${{ github.workspace }}\artifacts\Clippy-win-x64\
       - name: Verify executable exists
