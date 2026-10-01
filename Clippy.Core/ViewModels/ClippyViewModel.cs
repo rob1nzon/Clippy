@@ -72,25 +72,35 @@ namespace Clippy.Core.ViewModels
 					CurrentText = "";
 					await Task.Delay(300);
 
-					var messageVM = AddMessage(new Message(Role.Assistant, "")) as ClippyMessageViewModel;
+                    var assistantMessage = new Message(Role.Assistant, "");
+					var messageVM = AddMessage(assistantMessage) as ClippyMessageViewModel;
 					UpdatedAt = DateTime.Now;
 					messageVM?.StartStreamText(cancellationToken);
+                    var responseText = new StringBuilder();
 
 					try
 					{
 						await foreach (var chunk in ChatService.StreamChatAsync(Messages, cancellationToken))
+                        {
+                            responseText.Append(chunk);
 							messageVM?.AddStreamText(chunk);
+                        }
 					}
-					catch (TaskCanceledException)
+					catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 					{
 						return; // Task cancelled so it is ok
 					}
 					catch (Exception e)
 					{
-						messageVM?.Exception(e);
+						messageVM?.AddStreamText("\n\nConnection error: " + e.Message);
 					}
-
-					messageVM?.EndStreamText();
+                    finally
+                    {
+                        messageVM?.EndStreamText();
+                        var index = Messages.IndexOf(assistantMessage);
+                        if (messageVM != null && index >= 0)
+                            Messages[index] = new Message(Role.Assistant, responseText.ToString());
+                    }
 				}
 			}
 			catch (Exception e)

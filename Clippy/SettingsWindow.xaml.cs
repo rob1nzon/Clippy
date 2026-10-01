@@ -41,14 +41,38 @@ namespace Clippy
             this.InitializeComponent();
             this.ExtendsContentIntoTitleBar = true;
             SetTitleBar(AppTitleBar);
-			SetupStartup();
+            ServerKeyBox.Password = App.Current.Services.GetRequiredService<IKeyService>().GetKey();
+            StartupToggle.IsEnabled = false;
+            StartupErrorText.Text = "For this EXE, add a shortcut to shell:startup to run on login.";
+            StartupErrorText.Visibility = Visibility.Visible;
 		}
 
-		private async void SetupStartup()
-		{
-			var startup = await StartupTask.GetAsync("ClippyStartupTaskId");
-			UpdateToggleState(startup.State);
-		}
+        private void SaveConnection_Click(object sender, RoutedEventArgs e)
+        {
+            var url = ServerUrlBox.Text.Trim().TrimEnd('/');
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != "http" && uri.Scheme != "https") ||
+                !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
+            {
+                ConnectionStatus.Text = "Enter a valid HTTP server URL, for example http://192.168.1.10:8080/v1.";
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(ModelBox.Text) || double.IsNaN(MaxTokensBox.Value))
+            {
+                ConnectionStatus.Text = "Enter a model name and maximum response tokens.";
+                return;
+            }
+            try
+            {
+                App.Current.Services.GetRequiredService<IKeyService>().SetKey(ServerKeyBox.Password);
+                Settings.ServerUrl = url;
+                Settings.Model = ModelBox.Text.Trim();
+                Settings.Tokens = (int)MaxTokensBox.Value;
+                ConnectionStatus.Text = "Connection saved. New messages will use these settings.";
+            }
+            catch (Exception error) { ConnectionStatus.Text = "Could not save connection: " + error.Message; }
+        }
+
 		private async void Star_Click(object sender, RoutedEventArgs e) => await Launcher.LaunchUriAsync(new Uri("ms-windows-store://review/?ProductId=9NWK37S35V5T"));
 
 		private async void Hub_Click(object sender, RoutedEventArgs e) => await Launcher.LaunchUriAsync(new Uri("https://discord.gg/3WYcKat"));
@@ -57,50 +81,5 @@ namespace Clippy
 
         private void Exit_Click(object sender, RoutedEventArgs e) => Application.Current.Exit();
 
-		private void UpdateToggleState(StartupTaskState state)
-		{
-			StartupToggle.IsEnabled = true;
-			StartupErrorText.Visibility = Visibility.Collapsed;
-			switch (state)
-			{
-				case StartupTaskState.Enabled:
-					StartupToggle.IsOn = true;
-					break;
-				case StartupTaskState.Disabled:
-					break;
-				case StartupTaskState.DisabledByUser:
-					StartupToggle.IsOn = false;
-					StartupErrorText.Visibility = Visibility.Visible;
-					StartupErrorText.Text = "Unable to change state of startup task via the application - enable via Startup page in Windows Settings";
-					break;
-				default:
-					StartupToggle.IsEnabled = false;
-					break;
-			}
-		}
-
-		private async void StartupToggle_Toggled(object sender, RoutedEventArgs e)
-		{
-			bool enable = StartupToggle.IsOn;
-			var startup = await StartupTask.GetAsync("ClippyStartupTaskId");
-			StartupErrorText.Visibility = Visibility.Collapsed;
-			switch (startup.State)
-			{
-				case StartupTaskState.Enabled when !enable:
-					startup.Disable();
-					break;
-				case StartupTaskState.Disabled when enable:
-					var updatedState = await startup.RequestEnableAsync();
-					UpdateToggleState(updatedState);
-					break;
-				case StartupTaskState.DisabledByUser when enable:
-					StartupToggle.IsOn = false;
-					StartupErrorText.Visibility = Visibility.Visible;
-					StartupErrorText.Text = "Unable to change state of startup task via the application - enable via Startup page in Windows Settings";
-					break;
-				default:
-					break;
-			}
-		}
 	}
 }

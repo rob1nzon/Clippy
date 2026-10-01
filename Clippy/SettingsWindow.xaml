@@ -51,6 +51,15 @@
                         <TextBlock FontSize="24" FontWeight="SemiBold">Clippy by FireCube</TextBlock>
                         <TextBlock FontSize="20" Opacity="0.7" FontWeight="SemiBold" VerticalAlignment="Bottom"> - 1.0</TextBlock>
                     </StackPanel>
+                    <TextBlock FontSize="14" FontWeight="SemiBold" Margin="4, 4, 4, 8">Model connection (llama.cpp)</TextBlock>
+                    <StackPanel Spacing="12" Margin="4">
+                        <TextBox x:Name="ServerUrlBox" Header="Server URL" PlaceholderText="http://192.168.1.10:8080/v1" Text="{x:Bind Settings.ServerUrl, Mode=OneWay}"/>
+                        <TextBox x:Name="ModelBox" Header="Model name / --alias" Text="{x:Bind Settings.Model, Mode=OneWay}"/>
+                        <PasswordBox x:Name="ServerKeyBox" Header="API key (optional)" PlaceholderText="Leave empty if the server has no API key"/>
+                        <NumberBox x:Name="MaxTokensBox" Header="Maximum response tokens" Value="{x:Bind Settings.Tokens, Mode=OneWay}" Minimum="1" Maximum="32768" SpinButtonPlacementMode="Inline"/>
+                        <Button Content="Save connection" Click="SaveConnection_Click"/>
+                        <TextBlock x:Name="ConnectionStatus" TextWrapping="Wrap"/>
+                    </StackPanel>
                    <!-- <TextBlock FontSize="14" FontWeight="SemiBold" Margin="4, 4, 4, 2">API Key</TextBlock>
                     <settings:SettingsBlockControl Title="OpenAI Api" Margin="2" Description="OpenAI API key for Clippy">
                         <settings:SettingsBlockControl.Icon>
@@ -92,7 +101,7 @@
                         <settings:SettingsBlockControl.Icon>
                             <icons:FluentIconElement VerticalAlignment="Center" Symbol="ClockAlarm24"/>
                         </settings:SettingsBlockControl.Icon>
-                        <ToggleSwitch x:Name="StartupToggle" Toggled="StartupToggle_Toggled" Style="{ThemeResource GlowSwitch}" OnContent="On" HorizontalAlignment="Right" OffContent="Off"/>
+                        <ToggleSwitch x:Name="StartupToggle" IsEnabled="False" Style="{ThemeResource GlowSwitch}" OnContent="On" HorizontalAlignment="Right" OffContent="Off"/>
                     </settings:SettingsBlockControl>
                     <TextBlock x:Name="StartupErrorText" Text="" Visibility="Collapsed" TextWrapping="WrapWholeWords" Foreground="{ThemeResource RedLinearGradientBrush}"/>
                     <settings:SettingsBlockControl Title="Show Clippy in Tray" Margin="2" Description="Summon Clippy from the System Tray area">

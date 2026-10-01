@@ -36,6 +36,45 @@ Get Clippy on [Microsoft Store](https://apps.microsoft.com/store/detail/clippy-b
 - Clippy.Core - Contains most of chat logic including interfaces IChatService and an implementation for OpenAI key official
 - Clippy - App with UI, Windows, Message design and logic of UI (message loading)
 
+## Local network model (llama.cpp)
+
+Start an instruction/chat GGUF model on the server machine:
+
+```sh
+llama-server -m /path/to/model.gguf --host 0.0.0.0 --port 8080 --alias local-model
+```
+
+Allow inbound TCP port 8080 on the server's firewall for your local network.
+In Clippy Settings, enter `http://192.168.1.10:8080/v1` (replace the IP),
+model `local-model`, and the maximum response tokens. Click **Save connection**.
+The `/v1` suffix is optional. API key may be empty; if the server uses
+`--api-key`, enter the same key in Clippy. Keys are stored in Windows Credential
+Locker; other settings are in `%LOCALAPPDATA%\Clippy\settings.json`.
+New messages use the saved connection immediately. Refresh the chat after changing
+models if you want to start a fresh conversation.
+
+See the [llama.cpp server documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
+
+## Build / download Windows EXE
+
+In your fork, open **Actions → Build Clippy EXE → Run workflow** and select your
+branch. After a successful run, download the **Clippy-win-x64** artifact, extract
+the entire ZIP, and launch `Clippy.exe`. Keep the DLLs and Assets beside the EXE.
+The artifact includes .NET and Windows App SDK; MSIX installation is not required.
+Windows 10 version 1903 or newer is required (Windows 11 recommended).
+
+To build locally, use Windows with Visual Studio 2022, the WinUI/.NET desktop
+build tools, .NET 9 SDK, and Windows SDK 10.0.22621.0 or newer. In a Developer
+PowerShell from the repository directory:
+
+```powershell
+msbuild Clippy\Clippy.csproj /restore /t:Publish /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifier=win-x64 /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true /p:SelfContained=true /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=false /p:PublishDir="$PWD\artifacts\Clippy-win-x64\"
+```
+
+This WinUI app must be built on Windows. The portable version has no tray integration;
+to run on login, put a shortcut to `Clippy.exe` in the `shell:startup` folder.
+See [Microsoft's self-contained deployment documentation](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/self-contained-deploy/deploy-self-contained-apps).
+
 <hr>
 <h6 align="center">© FireCubeStudios. 2023
 <br>
@@ -43,6 +82,5 @@ All Rights Reserved</h6>
 <p align="center">
 	<a href="https://github.com/FireCubeStudios/Clippy/blob/master/LICENSE.txt"><img src="https://img.shields.io/static/v1.svg?style=for-the-badge&label=License&message=MIT&logoColor=d9e0ee&colorA=363a4f&colorB=b7bdf8"/></a>
 </p>
-
 
 

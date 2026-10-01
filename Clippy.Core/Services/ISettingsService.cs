@@ -11,5 +11,7 @@ namespace Clippy.Core.Services
         public bool TranslucentBackground { get; set; }
         public bool KeyboardEnabled { get; set; }
         public int Tokens { get; set; }
+        public string ServerUrl { get; set; }
+        public string Model { get; set; }
     }
 }

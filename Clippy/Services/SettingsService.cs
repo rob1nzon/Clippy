@@ -6,32 +6,33 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Windows.Storage;
 
 namespace Clippy.Services
 {
     public class SettingsService : ObservableObject, ISettingsService
     {
-        private static ApplicationDataContainer Settings = ApplicationData.Current.LocalSettings;
+        private static readonly SettingsStore Settings = new();
 
-        private bool autoPin = (bool)(Settings.Values["AutoPin"] ?? true);
+        private bool autoPin = (bool)Settings.Get("AutoPin", true);
         public bool AutoPin
         {
             get => autoPin;
             set
             {
                 Settings.Values["AutoPin"] = value;
+                Settings.Save();
                 SetProperty(ref autoPin, value);
             }
         }
 
-        private bool trayClippy = (bool)(Settings.Values["TrayClippy"] ?? true);
+        private bool trayClippy = (bool)Settings.Get("TrayClippy", true);
         public bool TrayClippy
         {
             get => trayClippy;
             set
             {
                 Settings.Values["TrayClippy"] = value;
+                Settings.Save();
                 SetProperty(ref trayClippy, value);
                 //if (value)
                    // ClippyTrayListener.Recreate();
@@ -40,42 +41,54 @@ namespace Clippy.Services
             }
         }
 
-        private bool translucentBackground = (bool)(Settings.Values["TranslucentBackground"] ?? true);
+        private bool translucentBackground = (bool)Settings.Get("TranslucentBackground", true);
         public bool TranslucentBackground
         {
             get => translucentBackground;
             set
             {
                 Settings.Values["TranslucentBackground"] = value;
+                Settings.Save();
                 SetProperty(ref translucentBackground, value);
             }
         }
 
-        private int tokens = (int)(Settings.Values["Tokens"] ?? 100);
+        private int tokens = (int)Settings.Get("Tokens", 512);
         public int Tokens
         {
             get => tokens;
             set
             {
-                if (value > 50 && value < 2000)
-                {
-                    Settings.Values["Tokens"] = value;
-                    SetProperty(ref tokens, value);
-                }
-                else
-                    SetProperty(ref tokens, 100);
+                value = Math.Clamp(value, 1, 32768);
+                Settings.Values["Tokens"] = value;
+                Settings.Save();
+                SetProperty(ref tokens, value);
             }
         }
 
-        private bool keyboardEnabled = (bool)(Settings.Values["KeyboardEnabled"] ?? true);
+        private bool keyboardEnabled = (bool)Settings.Get("KeyboardEnabled", true);
         public bool KeyboardEnabled
         {
             get => keyboardEnabled;
             set
             {
                 Settings.Values["KeyboardEnabled"] = value;
+                Settings.Save();
                 SetProperty(ref keyboardEnabled, value);
             }
+        }
+        private string serverUrl = (string)Settings.Get("ServerUrl", "http://localhost:8080/v1");
+        public string ServerUrl
+        {
+            get => serverUrl;
+            set { Settings.Values["ServerUrl"] = value; Settings.Save(); SetProperty(ref serverUrl, value); }
+        }
+
+        private string model = (string)Settings.Get("Model", "local-model");
+        public string Model
+        {
+            get => model;
+            set { Settings.Values["Model"] = value; Settings.Save(); SetProperty(ref model, value); }
         }
     }
 }

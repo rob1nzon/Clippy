@@ -19,7 +19,9 @@ namespace Clippy.Services
         {
             try
             {
-                return Vault.Retrieve(Resource, Name).Password;
+                var credential = Vault.Retrieve(Resource, Name);
+                credential.RetrievePassword();
+                return credential.Password;
             }
             catch
             {
@@ -27,6 +29,13 @@ namespace Clippy.Services
             }
         }
 
-        public void SetKey(string key) => Vault.Add(new PasswordCredential(Resource, Name, key));
+        public void SetKey(string key)
+        {
+            PasswordCredential existing = null;
+            try { existing = Vault.Retrieve(Resource, Name); }
+            catch (System.Runtime.InteropServices.COMException) { }
+            if (existing != null) Vault.Remove(existing);
+            if (!string.IsNullOrWhiteSpace(key)) Vault.Add(new PasswordCredential(Resource, Name, key.Trim()));
+        }
     }
 }

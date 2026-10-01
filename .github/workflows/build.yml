@@ -1,140 +1,41 @@
-name: Build Clippy
+name: Build Clippy EXE
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [master, main]
   pull_request:
-    branches: [ master, main ]
+    branches: [master, main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: windows-2022
-    
-    env:
-      Solution_Name: Clippy.sln
-      Configuration: Debug  # Попробуем Debug - часто в Release могут быть недостающие файлы
-      Platform: x64
-      TargetPlatformVersion: 10.0.22621.0
-      
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        # Попробуем использовать конкретный коммит если master нестабилен
-        ref: master
-        submodules: recursive  # На случай если есть подмодули
-      
-    - name: Check for Tray folder
-      run: |
-        Write-Host "Checking repository structure..."
-        Get-ChildItem -Path . -Recurse -Directory | Select-Object FullName
-        Write-Host "`nChecking for Tray related files..."
-        Get-ChildItem -Path . -Recurse -Filter "*Tray*" | Select-Object FullName
-    
-    - name: Patch App.xaml.cs to remove Tray dependency
-      shell: pwsh
-      run: |
-        $appXamlCs = "Clippy\App.xaml.cs"
-        if (Test-Path $appXamlCs) {
-          Write-Host "Reading App.xaml.cs..."
-          $lines = Get-Content $appXamlCs
-          
-          Write-Host "Patching App.xaml.cs to remove Tray dependency..."
-          $newLines = @()
-          $skipBlock = $false
-          
-          for ($i = 0; $i -lt $lines.Count; $i++) {
-            $line = $lines[$i]
-            
-            # Comment out using Clippy.Tray
-            if ($line -match 'using Clippy\.Tray') {
-              $newLines += "        // $line  // Patched: Tray not available"
-              continue
-            }
-            
-            # Comment out TrayFlyoutWindow declarations and usage
-            if ($line -match 'TrayFlyoutWindow') {
-              $newLines += "        // $line  // Patched: Tray not available"
-              continue
-            }
-            
-            $newLines += $line
-          }
-          
-          Set-Content $appXamlCs -Value $newLines
-          Write-Host "✓ Patch applied successfully"
-        } else {
-          Write-Host "✗ App.xaml.cs not found!"
-          exit 1
-        }
-        
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '8.0.x'
-        
-    - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v2
-      with:
-        msbuild-architecture: x64
-    
-    - name: Add CommunityToolkit Labs NuGet source
-      run: |
-        dotnet nuget add source https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json --name CommunityToolkit-Labs
-      
-    - name: Restore NuGet packages
-      run: nuget restore $env:Solution_Name -Source "https://api.nuget.org/v3/index.json;https://pkgs.dev.azure.com/dotnet/CommunityToolkit/_packaging/CommunityToolkit-Labs/nuget/v3/index.json"
-      continue-on-error: false
-      
-    - name: Restore dependencies
-      run: dotnet restore $env:Solution_Name
-      continue-on-error: false
-    
-    # Попробуем собрать только стабильные компоненты
-    - name: Build CubeKit.UI
-      run: msbuild CubeKit.UI\CubeKit.UI.csproj /t:Restore,Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxPackageSigningEnabled=false
-      continue-on-error: false
-    
-    - name: Build Clippy.Core
-      run: msbuild Clippy.Core\Clippy.Core.csproj /t:Restore,Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxPackageSigningEnabled=false
-      continue-on-error: false
-      
-    - name: Build main Clippy project
-      run: msbuild Clippy\Clippy.csproj /t:Build /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageSigningEnabled=false /p:TargetPlatformVersion=$env:TargetPlatformVersion /p:GenerateAppxPackageOnBuild=false /verbosity:detailed
-      continue-on-error: true  # Даже если не соберется, покажет детальную информацию
-    
-    - name: Build MSIX Package
-      run: |
-        msbuild Clippy\Clippy.csproj /t:Build,Publish /p:Configuration=$env:Configuration /p:Platform=$env:Platform /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxBundle=Never /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages\" /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=true
-      continue-on-error: true
-      
-    - name: Find executables
-      run: |
-        Write-Host "Searching for EXE files..."
-        Get-ChildItem -Path . -Recurse -Filter "*.exe" | Select-Object FullName, Length, LastWriteTime
-        Write-Host "`nSearching in bin folders..."
-        Get-ChildItem -Path . -Recurse -Filter "bin" -Directory | ForEach-Object {
-          Write-Host "`nContents of $($_.FullName):"
-          Get-ChildItem -Path $_.FullName -Recurse | Select-Object FullName, Length
-        }
-      
-    - name: Upload build artifacts (if any)
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: Clippy-Build-${{ github.sha }}
-        path: |
-          **/bin/Debug/**
-          **/bin/x64/**
-          **/AppPackages/**
-        retention-days: 7
-
-    - name: Upload build logs
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: Build-Logs-${{ github.sha }}
-        path: |
-          **/*.log
-        retention-days: 7
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+      - name: Test model connection logic
+        run: dotnet run --project tests/Clippy.ConnectionTests -c Release
+      - name: Publish portable Windows x64 app
+        run: >-
+          msbuild Clippy\Clippy.csproj /restore /t:Publish
+          /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifier=win-x64
+          /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true /p:SelfContained=true
+          /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=false
+          /p:PublishDir=${{ github.workspace }}\artifacts\Clippy-win-x64\
+      - name: Verify executable exists
+        shell: pwsh
+        run: |
+          if (!(Test-Path artifacts/Clippy-win-x64/Clippy.exe)) { throw "Clippy.exe was not produced" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Clippy-win-x64
+          path: artifacts/Clippy-win-x64/
+          if-no-files-found: error
