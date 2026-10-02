@@ -19,15 +19,22 @@ namespace Clippy.Core.Services
         private readonly ISettingsService settings;
         private readonly IKeyService keys;
         private readonly HttpClient client;
+        private readonly IToolService? toolService;
+        public Func<string, string, CancellationToken, Task<bool>>? ApproveToolCall { get; set; }
 
-        public ChatService(ISettingsService settings, IKeyService keys, HttpClient? client = null)
+        public ChatService(ISettingsService settings, IKeyService keys, HttpClient? client = null, IToolService? toolService = null)
         {
             this.settings = settings;
             this.keys = keys;
             this.client = client ?? DefaultClient;
+            this.toolService = toolService;
         }
 
-        private HttpRequestMessage CreateRequest(IEnumerable<IMessage> messages, bool stream)
+        private static List<object> WireMessages(IEnumerable<IMessage> messages) => messages
+            .Where(m => !string.IsNullOrWhiteSpace(m.MessageText))
+            .Select(m => (object)new { role = m.Role.ToString().ToLowerInvariant(), content = m.MessageText }).ToList();
+
+        private HttpRequestMessage CreateRequest(IEnumerable<object> messages, bool stream, IReadOnlyList<ToolDefinition>? tools = null)
         {
             var url = settings.ServerUrl.Trim().TrimEnd('/');
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
@@ -41,14 +48,14 @@ namespace Clippy.Core.Services
             var key = keys.GetKey();
             if (!string.IsNullOrWhiteSpace(key))
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key.Trim());
-            request.Content = new StringContent(JsonSerializer.Serialize(new
+            var payload = new Dictionary<string, object>
             {
-                model = settings.Model.Trim(),
-                messages = messages.Where(m => !string.IsNullOrWhiteSpace(m.MessageText))
-                    .Select(m => new { role = m.Role.ToString().ToLowerInvariant(), content = m.MessageText }).ToArray(),
-                max_tokens = settings.Tokens,
-                stream
-            }), Encoding.UTF8, "application/json");
+                ["model"] = settings.Model.Trim(), ["messages"] = messages,
+                ["max_tokens"] = settings.Tokens, ["stream"] = stream
+            };
+            if (tools?.Count > 0)
+                payload["tools"] = tools.Select(t => new { type = "function", function = new { name = t.Name, description = t.Description, parameters = t.Parameters } }).ToArray();
+            request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
             return request;
         }
 
@@ -61,7 +68,13 @@ namespace Clippy.Core.Services
 
         public async Task<string> SendChatAsync(IEnumerable<IMessage> messages)
         {
-            using var request = CreateRequest(messages, false);
+            if (settings.McpEnabled)
+            {
+                var text = new StringBuilder();
+                await foreach (var chunk in StreamChatAsync(messages)) text.Append(chunk);
+                return text.ToString();
+            }
+            using var request = CreateRequest(WireMessages(messages), false);
             using var response = await client.SendAsync(request);
             await CheckResponse(response);
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -71,7 +84,68 @@ namespace Clippy.Core.Services
         public async IAsyncEnumerable<string> StreamChatAsync(IEnumerable<IMessage> messages,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            using var request = CreateRequest(messages, true);
+            var conversation = WireMessages(messages);
+            var tools = settings.McpEnabled
+                ? await (toolService ?? throw new InvalidOperationException("MCP tool service is unavailable.")).ListToolsAsync(cancellationToken)
+                : Array.Empty<ToolDefinition>();
+            for (var round = 0; round < 8; round++)
+            {
+                var text = new StringBuilder();
+                var calls = new SortedDictionary<int, PendingToolCall>();
+                using var request = CreateRequest(conversation, true, tools);
+                await foreach (var packet in ReadPacketsAsync(request, cancellationToken))
+                {
+                    if (packet.TryGetProperty("error", out var error)) throw new HttpRequestException("Model server error: " + error);
+                    if (!packet.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0) continue;
+                    if (!choices[0].TryGetProperty("delta", out var delta)) continue;
+                    if (delta.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String)
+                    {
+                        var chunk = content.GetString()!;
+                        text.Append(chunk);
+                        yield return chunk;
+                    }
+                    if (!delta.TryGetProperty("tool_calls", out var toolCalls)) continue;
+                    foreach (var item in toolCalls.EnumerateArray())
+                    {
+                        var index = item.GetProperty("index").GetInt32();
+                        if (!calls.TryGetValue(index, out var call)) calls[index] = call = new PendingToolCall();
+                        if (item.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String) call.Id.Append(id.GetString());
+                        if (!item.TryGetProperty("function", out var function)) continue;
+                        if (function.TryGetProperty("name", out var name)) call.Name.Append(name.GetString());
+                        if (function.TryGetProperty("arguments", out var args)) call.Arguments.Append(args.GetString());
+                    }
+                }
+                if (calls.Count == 0) yield break;
+                if (!settings.McpEnabled || toolService == null) throw new InvalidOperationException("The model requested tools, but MCP is disabled.");
+                if (round == 7) throw new InvalidOperationException("MCP tool call limit reached. Send a new message to continue.");
+                foreach (var call in calls.Values)
+                    if (call.Id.Length == 0) call.Id.Append("call_" + Guid.NewGuid().ToString("N"));
+                conversation.Add(new { role = "assistant", content = text.ToString(), tool_calls = calls.Values.Select(c => c.ToWire()).ToArray() });
+                foreach (var call in calls.Values)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var name = call.Name.ToString();
+                    if (!tools.Any(t => t.Name == name)) throw new InvalidOperationException("The model requested an unknown MCP tool: " + name);
+                    var args = call.Arguments.Length == 0 ? "{}" : call.Arguments.ToString();
+                    using var parsedArgs = JsonDocument.Parse(args);
+                    if (parsedArgs.RootElement.ValueKind != JsonValueKind.Object) throw new InvalidOperationException("MCP tool arguments must be a JSON object.");
+                    if (ApproveToolCall == null) throw new InvalidOperationException("MCP tool approval is unavailable.");
+                    var allowed = await ApproveToolCall(name, args, cancellationToken);
+                    var result = allowed ? await toolService.CallToolAsync(name, args, cancellationToken) : "User declined this tool call. Do not retry it.";
+                    conversation.Add(new { role = "tool", tool_call_id = call.Id.ToString(), content = result });
+                }
+            }
+        }
+
+        private sealed class PendingToolCall
+        {
+            public StringBuilder Id = new(), Name = new(), Arguments = new();
+            public object ToWire() => new { id = Id.ToString(), type = "function", function = new { name = Name.ToString(), arguments = Arguments.ToString() } };
+        }
+
+        private async IAsyncEnumerable<JsonElement> ReadPacketsAsync(HttpRequestMessage request,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             await CheckResponse(response);
             using var body = await response.Content.ReadAsStreamAsync();
@@ -91,12 +165,7 @@ namespace Clippy.Core.Services
                 if (data == "[DONE]") yield break;
                 if (data.Length == 0) continue;
                 using var json = JsonDocument.Parse(data);
-                if (json.RootElement.TryGetProperty("error", out var error))
-                    throw new HttpRequestException("Model server error: " + error);
-                if (!json.RootElement.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0) continue;
-                if (choices[0].TryGetProperty("delta", out var delta) &&
-                    delta.TryGetProperty("content", out var content) && content.ValueKind == JsonValueKind.String)
-                    yield return content.GetString()!;
+                yield return json.RootElement.Clone();
             }
         }
     }

@@ -42,6 +42,8 @@ using System.Reflection.Metadata;
 using Clippy.Core.Classes;
 using System.ComponentModel;
 using Windows.Graphics;
+using System.Threading;
+using System.Threading.Tasks;
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
 
@@ -110,6 +112,28 @@ namespace Clippy
         }
 
         public void DisposeTray() => tray?.Dispose();
+
+        public async Task<bool> ConfirmToolCallAsync(string name, string arguments, CancellationToken cancellationToken)
+        {
+            App.Current.ShowClippy();
+            Clippy.IsClippyEnabled = true;
+            var dialog = new ContentDialog
+            {
+                XamlRoot = Background.XamlRoot,
+                Title = "Run MCP tool: " + name,
+                Content = new ScrollViewer
+                {
+                    MaxHeight = 300,
+                    Content = new TextBlock { Text = arguments, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true }
+                },
+                PrimaryButtonText = "Run tool", CloseButtonText = "Decline",
+                DefaultButton = ContentDialogButton.Close
+            };
+            using var registration = cancellationToken.Register(() => DispatcherQueue.TryEnqueue(() => dialog.Hide()));
+            var result = await dialog.ShowAsync();
+            cancellationToken.ThrowIfCancellationRequested();
+            return result == ContentDialogResult.Primary;
+        }
 
         private void SettingsChanged(object sender, PropertyChangedEventArgs e)
         {

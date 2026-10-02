@@ -77,6 +77,8 @@ namespace Clippy
             services.AddSingleton<IChatService, ChatService>();
             services.AddSingleton<IKeyService, KeyService>();
             services.AddSingleton<ISettingsService, SettingsService>();
+            services.AddSingleton<IToolService>(provider => new McpToolService(
+                provider.GetRequiredService<ISettingsService>(), () => new KeyService("Clippy.MCP").GetKey()));
             services.AddSingleton<ClippyViewModel>();
 
             return services.BuildServiceProvider();
@@ -97,6 +99,7 @@ namespace Clippy
 			if (m_window is null)
             {
 				m_window = new MainWindow();
+                ((ChatService)Services.GetRequiredService<IChatService>()).ApproveToolCall = m_window.ConfirmToolCallAsync;
                 m_window.Closed += (_, _) => m_window = null;
             }
 			m_window.Activate();
@@ -116,11 +119,14 @@ namespace Clippy
 
         public bool IsExiting { get; private set; }
 
-        public void ExitApplication()
+        public async void ExitApplication()
         {
+            if (IsExiting) return;
             IsExiting = true;
+            Services.GetRequiredService<ClippyViewModel>().SendPromptCommand.Cancel();
             m_window?.DisposeTray();
-            Application.Current.Exit();
+            try { await ((McpToolService)Services.GetRequiredService<IToolService>()).DisposeAsync(); }
+            finally { Application.Current.Exit(); }
         }
 
         private MainWindow m_window;

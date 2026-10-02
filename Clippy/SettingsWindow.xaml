@@ -71,6 +71,15 @@
                             </Grid>
                         </settings:SettingsBlockControl.ExpandableContent>
                     </settings:SettingsBlockControl>-->
+                    <TextBlock FontSize="14" FontWeight="SemiBold" Margin="4, 28, 4, 8">MCP tools</TextBlock>
+                    <StackPanel Spacing="12" Margin="4">
+                        <ToggleSwitch x:Name="McpEnabledSwitch" Header="Enable MCP tools" IsOn="{x:Bind Settings.McpEnabled, Mode=OneWay}"/>
+                        <TextBox x:Name="McpUrlBox" Header="MCP HTTP endpoint" PlaceholderText="http://192.168.1.10:3001/mcp" Text="{x:Bind Settings.McpServerUrl, Mode=OneWay}"/>
+                        <PasswordBox x:Name="McpKeyBox" Header="MCP Bearer token (optional)"/>
+                        <TextBlock Text="Use a tool-capable model with llama-server --jinja. Each tool call asks for confirmation." TextWrapping="Wrap"/>
+                        <Button x:Name="McpSaveButton" Content="Save and test MCP" Click="SaveMcp_Click"/>
+                        <TextBlock x:Name="McpStatus" TextWrapping="Wrap"/>
+                    </StackPanel>
                     <TextBlock FontSize="14" FontWeight="SemiBold" Margin="4, 28, 4, 2">Clippy Options</TextBlock>
                    <!-- <settings:SettingsBlockControl Title="Maximum tokens" Margin="2" Description="Maximum amount of tokens to use for Clippy input + output per prompt. (1 token = 2-3 words)">
                         <settings:SettingsBlockControl.Icon>

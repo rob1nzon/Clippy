@@ -42,10 +42,40 @@ namespace Clippy
             this.ExtendsContentIntoTitleBar = true;
             SetTitleBar(AppTitleBar);
             ServerKeyBox.Password = App.Current.Services.GetRequiredService<IKeyService>().GetKey();
+            McpKeyBox.Password = new KeyService("Clippy.MCP").GetKey();
             StartupToggle.IsEnabled = false;
             StartupErrorText.Text = "For this EXE, add a shortcut to shell:startup to run on login.";
             StartupErrorText.Visibility = Visibility.Visible;
 		}
+
+        private async void SaveMcp_Click(object sender, RoutedEventArgs e)
+        {
+            var url = McpUrlBox.Text.Trim();
+            if (McpEnabledSwitch.IsOn && (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != "http" && uri.Scheme != "https")))
+            {
+                McpStatus.Text = "Enter a valid MCP HTTP endpoint.";
+                return;
+            }
+            McpSaveButton.IsEnabled = false;
+            try
+            {
+                new KeyService("Clippy.MCP").SetKey(McpKeyBox.Password);
+                Settings.McpServerUrl = url;
+                Settings.McpEnabled = McpEnabledSwitch.IsOn;
+                if (!Settings.McpEnabled)
+                {
+                    await ((McpToolService)App.Current.Services.GetRequiredService<IToolService>()).DisposeAsync();
+                    McpStatus.Text = "MCP disabled.";
+                    return;
+                }
+                McpStatus.Text = "Connecting...";
+                using var timeout = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+                var tools = await App.Current.Services.GetRequiredService<IToolService>().ListToolsAsync(timeout.Token);
+                McpStatus.Text = $"Connected: {tools.Count} tools. " + string.Join(", ", tools.Select(t => t.Name));
+            }
+            catch (Exception error) { McpStatus.Text = "MCP connection error: " + error.Message; }
+            finally { McpSaveButton.IsEnabled = true; }
+        }
 
         private void SaveConnection_Click(object sender, RoutedEventArgs e)
         {

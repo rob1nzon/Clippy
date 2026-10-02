@@ -41,7 +41,7 @@ Get Clippy on [Microsoft Store](https://apps.microsoft.com/store/detail/clippy-b
 Start an instruction/chat GGUF model on the server machine:
 
 ```sh
-llama-server -m /path/to/model.gguf --host 0.0.0.0 --port 8080 --alias local-model
+llama-server -m /path/to/model.gguf --host 0.0.0.0 --port 8080 --alias local-model --jinja
 ```
 
 Allow inbound TCP port 8080 on the server's firewall for your local network.
@@ -54,6 +54,26 @@ New messages use the saved connection immediately. Refresh the chat after changi
 models if you want to start a fresh conversation.
 
 See the [llama.cpp server documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
+
+## MCP tools (v0.3.0)
+
+Clippy can connect to one MCP server over HTTP, including a server on another
+computer in your LAN. In Settings → MCP tools, enable MCP, enter the exact MCP
+endpoint (for example `http://192.168.1.10:3001/mcp`), optionally enter its Bearer
+token, and click **Save and test MCP**. The discovered tool names appear below.
+The MCP token is stored separately from the model API key in Windows Credential
+Locker. Disable MCP to return to ordinary chat.
+
+The model must support function calling; start llama-server with `--jinja`.
+Clippy sends the discovered tool schemas to the model, shows a confirmation
+dialog with each requested tool's name and JSON arguments, then returns the
+approved tool's result to the model. Declined tools are not executed. A request
+is limited to seven tool-call rounds. Local stdio processes, MCP resources,
+prompts and OAuth login are not part of this version.
+
+The client uses the [official MCP C# SDK](https://github.com/modelcontextprotocol/csharp-sdk),
+with the stable `2025-11-25` protocol. See also
+[llama.cpp function calling](https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md).
 
 ## Build / download Windows EXE
 

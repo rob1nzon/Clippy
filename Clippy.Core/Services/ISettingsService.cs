@@ -14,5 +14,7 @@ namespace Clippy.Core.Services
         public string ServerUrl { get; set; }
         public string Model { get; set; }
         public int ClippySize { get; set; }
+        public bool McpEnabled { get; set; }
+        public string McpServerUrl { get; set; }
     }
 }

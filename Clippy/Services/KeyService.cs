@@ -12,7 +12,8 @@ namespace Clippy.Services
     public class KeyService : IKeyService
     {
         private const string Name = "Key";
-        private const string Resource = "R";
+        private readonly string Resource;
+        public KeyService(string resource = "R") => Resource = resource;
         private PasswordVault Vault = new PasswordVault();
 
         public string GetKey()

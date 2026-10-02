@@ -6,6 +6,7 @@ using Clippy.Core.Interfaces;
 using Clippy.Core.Services;
 using Clippy.Core.ViewModels;
 using Clippy.Services;
+using System.Text;
 
 var settings = new Settings();
 var keys = new Keys();
@@ -122,6 +123,50 @@ Assert(CornerPlacement.Calculate(0, 0, 1280, 720, 2, 380, 1000) == (520, 0, 760,
 Assert(CornerPlacement.Calculate(0, 40, 1280, 984, 1, 224, 216) == (1056, 808, 224, 216), "large mascot and top taskbar");
 Console.WriteLine("All connection, settings and placement checks passed.");
 
+var mcpSettings = new Settings { McpEnabled = true };
+var mcpHandler = new McpServer();
+using var mcpHttp = new HttpClient(mcpHandler);
+await using var mcp = new McpToolService(mcpSettings, () => "mcp-secret", mcpHttp);
+var discovered = await mcp.ListToolsAsync();
+Assert(discovered.Count == 1 && discovered[0].Name == "echo", "MCP initialization and tools discovery");
+Assert(mcpHandler.SawSession && mcpHandler.SawProtocol && mcpHandler.SawToken, "MCP session, protocol and independent bearer token");
+Assert(await mcp.CallToolAsync("echo", "{\"text\":\"hello\"}") == "echo: hello", "MCP tool result returned");
+await Throws<InvalidOperationException>(() => mcp.CallToolAsync("unknown", "{}"), "unlisted MCP tool rejected");
+
+var toolResponse = "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_123\",\"function\":{\"name\":\"ec\",\"arguments\":\"{\\\"text\\\":\"}}]}}]}\n\n" +
+    "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"name\":\"ho\",\"arguments\":\"\\\"hello\\\"}\"}}]}}]}\n\ndata: [DONE]\n";
+var answerResponse = "data: {\"choices\":[{\"delta\":{\"content\":\"Tool answer\"}}]}\n\ndata: [DONE]\n";
+var modelServer = new Server();
+using var modelHttp = new HttpClient(modelServer);
+var toolChat = new ChatService(mcpSettings, new Keys(), modelHttp, mcp);
+modelServer.Responses.Enqueue(toolResponse);
+modelServer.Responses.Enqueue(answerResponse);
+var approved = false;
+toolChat.ApproveToolCall = (name, args, ct) =>
+{
+    approved = name == "echo" && args == "{\"text\":\"hello\"}";
+    return Task.FromResult(true);
+};
+Assert(await toolChat.SendChatAsync(messages) == "Tool answer" && approved, "fragmented model tool call requests approval");
+using (var payload = JsonDocument.Parse(modelServer.RequestBody!))
+{
+    var wireMessages = payload.RootElement.GetProperty("messages");
+    var last = wireMessages[wireMessages.GetArrayLength() - 1];
+    Assert(last.GetProperty("role").GetString() == "tool" && last.GetProperty("tool_call_id").GetString() == "call_123" &&
+        last.GetProperty("content").GetString() == "echo: hello", "MCP result fed back to model with matching call ID");
+    Assert(payload.RootElement.GetProperty("tools")[0].GetProperty("function").GetProperty("name").GetString() == "echo", "MCP schemas sent to llama.cpp");
+}
+var callsBefore = mcpHandler.ToolCalls;
+modelServer.Responses.Enqueue(toolResponse);
+modelServer.Responses.Enqueue(answerResponse);
+toolChat.ApproveToolCall = (_, _, _) => Task.FromResult(false);
+await toolChat.SendChatAsync(messages);
+Assert(mcpHandler.ToolCalls == callsBefore && modelServer.RequestBody!.Contains("User declined"), "declined tool never executes");
+mcpSettings.McpEnabled = false;
+Assert((await mcp.ListToolsAsync()).Count == 0, "disabled MCP has no tools");
+await Throws<InvalidOperationException>(() => mcp.CallToolAsync("echo", "{}"), "disabled MCP cannot execute tools");
+Console.WriteLine("All MCP checks passed.");
+
 sealed class Settings : ISettingsService
 {
     public bool AutoPin { get; set; }
@@ -130,6 +175,8 @@ sealed class Settings : ISettingsService
     public bool KeyboardEnabled { get; set; }
     public int Tokens { get; set; } = 512;
     public int ClippySize { get; set; } = 100;
+    public bool McpEnabled { get; set; }
+    public string McpServerUrl { get; set; } = "http://localhost:3001/mcp";
     public string ServerUrl { get; set; } = "http://192.168.1.10:8080";
     public string Model { get; set; } = "local-model";
 }
@@ -147,6 +194,7 @@ sealed class Server : HttpMessageHandler
     public HttpStatusCode Status = HttpStatusCode.OK;
     public string? Url, Authorization, RequestBody;
     public StalledStream? Stream;
+    public Queue<string> Responses = new();
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
@@ -154,7 +202,8 @@ sealed class Server : HttpMessageHandler
         Url = request.RequestUri!.ToString();
         Authorization = request.Headers.Authorization?.ToString();
         RequestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
-        return new HttpResponseMessage(Status) { Content = Stream == null ? new StringContent(Body) : new StreamContent(Stream) };
+        var body = Responses.Count > 0 ? Responses.Dequeue() : Body;
+        return new HttpResponseMessage(Status) { Content = Stream == null ? new StringContent(body) : new StreamContent(Stream) };
     }
 }
 
@@ -182,4 +231,47 @@ sealed class StalledStream : Stream
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
     public override void SetLength(long value) => throw new NotSupportedException();
     public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+}
+
+sealed class McpServer : HttpMessageHandler
+{
+    public bool SawSession, SawProtocol, SawToken;
+    public int ToolCalls;
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        if (request.Method == HttpMethod.Delete) return new HttpResponseMessage(HttpStatusCode.NoContent);
+        SawToken |= request.Headers.Authorization?.ToString() == "Bearer mcp-secret";
+        using var json = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+        var root = json.RootElement;
+        var method = root.GetProperty("method").GetString();
+        if (!root.TryGetProperty("id", out var id)) return new HttpResponseMessage(HttpStatusCode.Accepted);
+        if (method != "initialize")
+        {
+            SawSession |= request.Headers.TryGetValues("Mcp-Session-Id", out var values) && values.Contains("test-session");
+            SawProtocol |= request.Headers.Contains("Mcp-Protocol-Version");
+        }
+        object result;
+        switch (method)
+        {
+            case "initialize":
+                result = new { protocolVersion = root.GetProperty("params").GetProperty("protocolVersion").GetString(),
+                    capabilities = new { tools = new { } }, serverInfo = new { name = "test-mcp", version = "1.0" } };
+                break;
+            case "tools/list":
+                result = new { tools = new[] { new { name = "echo", description = "Echo text",
+                    inputSchema = new { type = "object", properties = new { text = new { type = "string" } }, required = new[] { "text" } } } } };
+                break;
+            case "tools/call":
+                ToolCalls++;
+                result = new { content = new[] { new { type = "text", text = "echo: " + root.GetProperty("params").GetProperty("arguments").GetProperty("text").GetString() } } };
+                break;
+            default: throw new Exception("Unexpected MCP method " + method);
+        }
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new { jsonrpc = "2.0", id, result }), Encoding.UTF8, "application/json")
+        };
+        if (method == "initialize") response.Headers.Add("Mcp-Session-Id", "test-session");
+        return response;
+    }
 }

@@ -73,6 +73,20 @@ namespace Clippy.Services
                 SetProperty(ref keyboardEnabled, value);
             }
         }
+        private bool mcpEnabled = (bool)Settings.Get("McpEnabled", false);
+        public bool McpEnabled
+        {
+            get => mcpEnabled;
+            set { Settings.Values["McpEnabled"] = value; Settings.Save(); SetProperty(ref mcpEnabled, value); }
+        }
+
+        private string mcpServerUrl = (string)Settings.Get("McpServerUrl", "http://localhost:3001/mcp");
+        public string McpServerUrl
+        {
+            get => mcpServerUrl;
+            set { Settings.Values["McpServerUrl"] = value; Settings.Save(); SetProperty(ref mcpServerUrl, value); }
+        }
+
         private int clippySize = Math.Clamp((int)Settings.Get("ClippySize", 100), 60, 200);
         public int ClippySize
         {
