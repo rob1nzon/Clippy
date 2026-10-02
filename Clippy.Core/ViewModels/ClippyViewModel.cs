@@ -24,7 +24,7 @@ namespace Clippy.Core.ViewModels
 		public ObservableCollection<IMessage> Messages = new();
 
 		[ObservableProperty]
-        private bool isClippyEnabled = true;
+        private bool isClippyEnabled = false;
 
         [ObservableProperty]
         private bool isPinned = true;

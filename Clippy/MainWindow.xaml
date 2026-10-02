@@ -41,7 +41,7 @@
         <Grid x:Name="Content" Canvas.ZIndex="1" Padding="12, 8, 12, 8">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="100" />
+                <RowDefinition Height="auto" />
                 <RowDefinition Height="auto" />
             </Grid.RowDefinitions>
             <ListView Grid.Row="0" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}" ItemTemplateSelector="{StaticResource MessageTemplateSelector}" SelectionMode="None" ItemsSource="{x:Bind Clippy.MessagesVM, Mode=OneWay}">
@@ -63,7 +63,7 @@
                     </TransitionCollection>
                 </ListView.ItemContainerTransitions>
             </ListView>
-            <Grid Grid.Row="1" Margin="0, -16, 0, 0">
+            <Grid Grid.Row="1">
                 <ToggleButton IsChecked="{x:Bind Clippy.IsClippyEnabled, Mode=TwoWay}" Style="{ThemeResource ClippyToggleButton}" Padding="0" HorizontalAlignment="Right" Checked="Clippy_Checked" Unchecked="Clippy_Unchecked">
                     <ToggleButton.ContextFlyout>
                         <MenuFlyout x:Name="Flyout" Placement="Bottom" ShouldConstrainToRootBounds="False">
@@ -105,7 +105,7 @@
                             </MenuFlyoutItem>
                         </MenuFlyout>
                     </ToggleButton.ContextFlyout>
-                    <Image Source="ms-appx:///Assets/Clippy/Clippy.png" Height="100" Width="100"/>
+                    <Image Source="ms-appx:///Assets/Clippy/Clippy.png" Height="{x:Bind Settings.ClippySize, Mode=OneWay}" Width="{x:Bind Settings.ClippySize, Mode=OneWay}"/>
                 </ToggleButton>
             </Grid>
             <Grid Grid.Row="2" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}"  VerticalAlignment="Bottom" HorizontalAlignment="Stretch">

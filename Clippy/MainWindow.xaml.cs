@@ -39,6 +39,9 @@ using static TerraFX.Interop.Windows.GWL;
 using static TerraFX.Interop.Windows.SWP;
 using static TerraFX.Interop.Windows.SW;
 using System.Reflection.Metadata;
+using Clippy.Core.Classes;
+using System.ComponentModel;
+using Windows.Graphics;
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
 
@@ -52,6 +55,7 @@ namespace Clippy
         private SettingsService Settings = (SettingsService)App.Current.Services.GetService<ISettingsService>();
         private ClippyViewModel Clippy = App.Current.Services.GetService<ClippyViewModel>();
         WindowMessageMonitor m;
+        private TrayService tray;
 
         public MainWindow()
         {
@@ -77,7 +81,7 @@ namespace Clippy
             this.BringToFront();
 			if (Clippy.IsPinned) Pin();
 			else Unpin();
-			Clippy.PropertyChanged += (object sender, System.ComponentModel.PropertyChangedEventArgs e) =>
+            Clippy.PropertyChanged += (object sender, System.ComponentModel.PropertyChangedEventArgs e) =>
             {
                 if(e.PropertyName == "IsPinned")
                 {
@@ -85,6 +89,32 @@ namespace Clippy
                     else Unpin();
                 }
             };
+            tray = new TrayService(this.GetWindowHandle(), () => App.Current.ShowClippy(),
+                () => this.Hide(), () => App.Current.OpenSettings(), () => App.Current.ExitApplication());
+            tray.SetVisible(Settings.TrayClippy);
+            Settings.PropertyChanged += SettingsChanged;
+            AppWindow.Closing += (_, args) =>
+            {
+                if (Settings.TrayClippy && !App.Current.IsExiting)
+                {
+                    args.Cancel = true;
+                    this.Hide();
+                }
+            };
+            Closed += (_, _) =>
+            {
+                Settings.PropertyChanged -= SettingsChanged;
+                DisposeTray();
+                m.Dispose();
+            };
+        }
+
+        public void DisposeTray() => tray?.Dispose();
+
+        private void SettingsChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(Settings.TrayClippy)) tray.SetVisible(Settings.TrayClippy);
+            if (e.PropertyName == nameof(Settings.ClippySize)) PositionInCorner();
         }
 
 		private unsafe void Pin()
@@ -116,6 +146,14 @@ namespace Clippy
 
         private void WindowMessageReceived(object? sender, WindowMessageEventArgs e)
         {
+            if (tray?.HandleMessage(e.Message.MessageId, e.Message.LParam) == true)
+            {
+                e.Handled = true;
+                e.Result = 0;
+                return;
+            }
+            if (e.Message.MessageId == 0x02e0 || e.Message.MessageId == 0x007e || e.Message.MessageId == 0x001a)
+                DispatcherQueue.TryEnqueue(PositionInCorner);
             if (e.Message.MessageId == PInvoke.WM_ERASEBKGND)
             {
                 e.Handled = true;
@@ -123,18 +161,16 @@ namespace Clippy
             }
         }
 
-        private double GetScale()
+        public void PositionInCorner()
         {
-            var progmanWindow = NativeHelper.FindWindow("Shell_TrayWnd", null);
-            var monitor = NativeHelper.MonitorFromWindow(progmanWindow, NativeHelper.MONITOR_DEFAULTTOPRIMARY);
-
-            NativeHelper.DeviceScaleFactor scale;
-            NativeHelper.GetScaleFactorForMonitor(monitor, out scale);
-
-            if (scale == NativeHelper.DeviceScaleFactor.DEVICE_SCALE_FACTOR_INVALID)
-                scale = NativeHelper.DeviceScaleFactor.SCALE_100_PERCENT;
-
-            return Convert.ToDouble(scale) / 100;
+            var display = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest);
+            var work = display.WorkArea;
+            var scale = this.GetDpiForWindow() / 96d;
+            var bounds = CornerPlacement.Calculate(work.X, work.Y, work.Width, work.Height, scale,
+                Clippy.IsClippyEnabled ? Math.Max(380, Settings.ClippySize + 24) : Settings.ClippySize + 24,
+                Clippy.IsClippyEnabled ? 1000 : Settings.ClippySize + 16);
+            AppWindow.MoveAndResize(new RectInt32(bounds.X, bounds.Y, bounds.Width, bounds.Height), display);
+            Content.MaxHeight = bounds.Height / scale;
         }
 
         private void Settings_Click(object sender, RoutedEventArgs e)
@@ -150,30 +186,12 @@ namespace Clippy
 
         private void Collapse()
         {
-            this.Height = 150;
-            this.Width = 150;
-            double Scale = GetScale();
-            double DisplayHeight = (DisplayArea.Primary.OuterBounds.Height) - 100;
-            double DisplayWidth = (DisplayArea.Primary.OuterBounds.Width) - 200;
-
-            double W = this.Width * Scale;
-            double H = this.Height * Scale;
-            this.MoveAndResize(DisplayWidth - W, DisplayHeight - H, this.Width, this.Height);
+            PositionInCorner();
         }
 
         private void Expand()
         {
-            this.Height = 1000;
-            this.Width = 380;
-            double Scale = GetScale();
-            double DisplayHeight = (DisplayArea.Primary.OuterBounds.Height) - 100;
-            double DisplayWidth = (DisplayArea.Primary.OuterBounds.Width) - 200;
-
-            double W = this.Width * Scale;
-            double H = this.Height * Scale;
-            this.MoveAndResize(DisplayWidth - W, DisplayHeight - H, this.Width, this.Height);
-
-            Content.MaxHeight = this.Height;
+            PositionInCorner();
         }
 
 		// Bool to Visibility
@@ -215,7 +233,7 @@ namespace Clippy
 			} */
 		}
 
-		private void Exit_Click(object sender, RoutedEventArgs e) => Application.Current.Exit();
+		private void Exit_Click(object sender, RoutedEventArgs e) => App.Current.ExitApplication();
 
 		private void Hide_Click(object sender, RoutedEventArgs e)
 		{

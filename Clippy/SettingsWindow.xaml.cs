@@ -79,7 +79,7 @@ namespace Clippy
 
         private async void GitHub_Click(object sender, RoutedEventArgs e) => await Launcher.LaunchUriAsync(new Uri("https://github.com/FireCubeStudios/Clippy"));
 
-        private void Exit_Click(object sender, RoutedEventArgs e) => Application.Current.Exit();
+        private void Exit_Click(object sender, RoutedEventArgs e) => App.Current.ExitApplication();
 
 	}
 }

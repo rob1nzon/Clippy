@@ -71,8 +71,12 @@ PowerShell from the repository directory:
 msbuild Clippy\Clippy.csproj /restore /t:Publish /p:Configuration=Release /p:Platform=x64 /p:RuntimeIdentifier=win-x64 /p:AppxPackageSigningEnabled=false /p:GenerateAppxPackageOnBuild=false /p:PublishDir="$PWD\artifacts\Clippy-win-x64\"
 ```
 
-This WinUI app must be built on Windows. The portable version has no tray integration;
-to run on login, put a shortcut to `Clippy.exe` in the `shell:startup` folder.
+This WinUI app must be built on Windows. Click the tray icon to show Clippy;
+right-click it for Show, Hide, Settings, and Exit. The tray can be disabled in
+Settings. The Clippy size slider changes the mascot from 60% to 200% and saves
+the choice. The window sits at the bottom-right of the current monitor's work
+area and adapts to DPI scaling, taskbar position and available screen height.
+To run on login, put a shortcut to `Clippy.exe` in the `shell:startup` folder.
 See [Microsoft's self-contained deployment documentation](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/self-contained-deploy/deploy-self-contained-apps).
 
 <hr>
@@ -82,4 +86,3 @@ All Rights Reserved</h6>
 <p align="center">
 	<a href="https://github.com/FireCubeStudios/Clippy/blob/master/LICENSE.txt"><img src="https://img.shields.io/static/v1.svg?style=for-the-badge&label=License&message=MIT&logoColor=d9e0ee&colorA=363a4f&colorB=b7bdf8"/></a>
 </p>
-

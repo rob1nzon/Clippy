@@ -85,6 +85,12 @@
                         <ToggleSwitch IsOn="{x:Bind Settings.KeyboardEnabled, Mode=TwoWay}" Style="{ThemeResource GlowSwitch}" OnContent="Win + Shift + C" HorizontalAlignment="Right" OffContent="Off"/>
                     </settings:SettingsBlockControl>
                     <TextBlock FontSize="14" FontWeight="SemiBold" Margin="4, 28, 4, 2">Personalisation Options</TextBlock>
+                    <settings:SettingsBlockControl Title="Clippy size" Margin="2" Description="Mascot size: 60% to 200%. Changes are saved automatically.">
+                        <StackPanel Width="220" Spacing="4">
+                            <Slider Minimum="60" Maximum="200" StepFrequency="10" Value="{x:Bind Settings.ClippySize, Mode=TwoWay}"/>
+                            <TextBlock Text="{x:Bind Settings.ClippySize, Mode=OneWay}" HorizontalAlignment="Right"/>
+                        </StackPanel>
+                    </settings:SettingsBlockControl>
                     <settings:SettingsBlockControl Title="Autopin Clippy" Margin="2" Description="Always pin Clippy to the top of the screen on startup">
                         <settings:SettingsBlockControl.Icon>
                             <icons:FluentIconElement VerticalAlignment="Center" Symbol="Pin24"/>
@@ -108,7 +114,7 @@
                         <settings:SettingsBlockControl.Icon>
                             <icons:FluentIconElement VerticalAlignment="Center" Symbol="Apps24"/>
                         </settings:SettingsBlockControl.Icon>
-                        <ToggleSwitch IsOn="{x:Bind Settings.TrayClippy, Mode=TwoWay}" IsEnabled="False" Style="{ThemeResource GlowSwitch}" OnContent="On" HorizontalAlignment="Right" OffContent="Off"/>
+                        <ToggleSwitch IsOn="{x:Bind Settings.TrayClippy, Mode=TwoWay}" Style="{ThemeResource GlowSwitch}" OnContent="On" HorizontalAlignment="Right" OffContent="Off"/>
                     </settings:SettingsBlockControl>
                     <TextBlock FontSize="14" FontWeight="SemiBold" Margin="4, 28, 4, 2">Information</TextBlock>
                     <settings:SettingsBlockControl Title="Rate the app!" Margin="2" Description="Help support us by rating the app!">

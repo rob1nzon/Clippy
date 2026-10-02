@@ -95,18 +95,33 @@ namespace Clippy
         public void ShowClippy()
         {
 			if (m_window is null)
+            {
 				m_window = new MainWindow();
+                m_window.Closed += (_, _) => m_window = null;
+            }
 			m_window.Activate();
             m_window.Show();
+            m_window.SetForegroundWindow();
         }
 
         public void OpenSettings()
 		{
 			if (s_window is null)
+            {
 				s_window = new SettingsWindow();
+                s_window.Closed += (sender, e) => { s_window = null; };
+            }
 			s_window.Activate();
-			s_window.Closed += (sender, e) => { s_window = null; };
 		}
+
+        public bool IsExiting { get; private set; }
+
+        public void ExitApplication()
+        {
+            IsExiting = true;
+            m_window?.DisposeTray();
+            Application.Current.Exit();
+        }
 
         private MainWindow m_window;
 

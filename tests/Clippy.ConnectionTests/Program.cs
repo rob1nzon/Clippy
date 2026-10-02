@@ -115,7 +115,12 @@ try
     Assert((int)new SettingsStore(path).Get("Tokens", 512) == 512, "malformed settings fall back");
 }
 finally { Directory.Delete(tempDir, true); }
-Console.WriteLine("All connection and settings checks passed.");
+Assert(CornerPlacement.Calculate(0, 0, 1920, 1040, 1, 124, 116) == (1796, 924, 124, 116), "mascot meets bottom-right work area");
+Assert(CornerPlacement.Calculate(0, 0, 1920, 1040, 1.5, 124, 116) == (1734, 866, 186, 174), "150% display scaling uses physical pixels once");
+Assert(CornerPlacement.Calculate(48, 0, 1872, 1080, 1, 380, 1000) == (1540, 80, 380, 1000), "side taskbar excluded");
+Assert(CornerPlacement.Calculate(0, 0, 1280, 720, 2, 380, 1000) == (520, 0, 760, 720), "chat height clamped on small displays");
+Assert(CornerPlacement.Calculate(0, 40, 1280, 984, 1, 224, 216) == (1056, 808, 224, 216), "large mascot and top taskbar");
+Console.WriteLine("All connection, settings and placement checks passed.");
 
 sealed class Settings : ISettingsService
 {
@@ -124,6 +129,7 @@ sealed class Settings : ISettingsService
     public bool TranslucentBackground { get; set; }
     public bool KeyboardEnabled { get; set; }
     public int Tokens { get; set; } = 512;
+    public int ClippySize { get; set; } = 100;
     public string ServerUrl { get; set; } = "http://192.168.1.10:8080";
     public string Model { get; set; } = "local-model";
 }

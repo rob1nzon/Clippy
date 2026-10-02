@@ -34,10 +34,6 @@ namespace Clippy.Services
                 Settings.Values["TrayClippy"] = value;
                 Settings.Save();
                 SetProperty(ref trayClippy, value);
-                //if (value)
-                   // ClippyTrayListener.Recreate();
-               // else
-                    // ClippyTrayListener.Remove();
             }
         }
 
@@ -77,6 +73,19 @@ namespace Clippy.Services
                 SetProperty(ref keyboardEnabled, value);
             }
         }
+        private int clippySize = Math.Clamp((int)Settings.Get("ClippySize", 100), 60, 200);
+        public int ClippySize
+        {
+            get => clippySize;
+            set
+            {
+                value = Math.Clamp(value, 60, 200);
+                Settings.Values["ClippySize"] = value;
+                Settings.Save();
+                SetProperty(ref clippySize, value);
+            }
+        }
+
         private string serverUrl = (string)Settings.Get("ServerUrl", "http://localhost:8080/v1");
         public string ServerUrl
         {
