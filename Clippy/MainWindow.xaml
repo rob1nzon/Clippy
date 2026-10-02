@@ -17,7 +17,7 @@
     xmlns:messages="using:Clippy.Controls.Messages" 
     xmlns:ToolkitControls="using:CommunityToolkit.WinUI.UI.Controls"
     mc:Ignorable="d">
-    <Grid x:Name="Background" BorderBrush="{ThemeResource MicaBorderBrush}" BorderThickness="0" PointerMoved="Background_PointerMoved" PointerPressed="Background_PointerPressed">
+    <Grid x:Name="Background" BorderBrush="{ThemeResource MicaBorderBrush}" BorderThickness="0">
         <Grid.Resources>
             <DataTemplate x:Key="ClippyMessageTemplate" x:DataType="vmm:ClippyMessageViewModel">
                 <messages:ClippyMessage ViewModel="{x:Bind }" Margin="0, 8, 0, 8"/>
@@ -37,14 +37,14 @@
                 SystemMessageTemplate="{StaticResource SystemMessageTemplate}" />
 
         </Grid.Resources>
-        <Grid Canvas.ZIndex="0" Background="{ThemeResource LayerFillColorDefaultBrush}" Visibility="{x:Bind BtoV(Settings.TranslucentBackground), Mode=OneWay}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+        <Grid Canvas.ZIndex="0" Background="{ThemeResource LayerFillColorDefaultBrush}" Visibility="{x:Bind ChatBackgroundVisibility(Clippy.IsClippyEnabled, Settings.TranslucentBackground), Mode=OneWay}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
         <Grid x:Name="Content" Canvas.ZIndex="1" Padding="12, 8, 12, 8">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="auto" />
                 <RowDefinition Height="auto" />
             </Grid.RowDefinitions>
-            <ListView Grid.Row="0" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}" ItemTemplateSelector="{StaticResource MessageTemplateSelector}" SelectionMode="None" ItemsSource="{x:Bind Clippy.MessagesVM, Mode=OneWay}">
+            <ListView x:Name="MessagesList" Grid.Row="0" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}" ItemTemplateSelector="{StaticResource MessageTemplateSelector}" SelectionMode="None" ItemsSource="{x:Bind Clippy.MessagesVM, Mode=OneWay}">
                 <ListView.ItemsPanel>
                     <ItemsPanelTemplate>
                         <ItemsStackPanel ItemsUpdatingScrollMode="KeepLastItemInView" VerticalAlignment="Bottom"/>
@@ -64,7 +64,7 @@
                 </ListView.ItemContainerTransitions>
             </ListView>
             <Grid Grid.Row="1">
-                <ToggleButton IsChecked="{x:Bind Clippy.IsClippyEnabled, Mode=TwoWay}" Style="{ThemeResource ClippyToggleButton}" Padding="0" HorizontalAlignment="Right" Checked="Clippy_Checked" Unchecked="Clippy_Unchecked">
+                <ToggleButton x:Name="ClippyButton" IsChecked="{x:Bind Clippy.IsClippyEnabled, Mode=TwoWay}" Style="{ThemeResource ClippyToggleButton}" Padding="0" HorizontalAlignment="Right">
                     <ToggleButton.ContextFlyout>
                         <MenuFlyout x:Name="Flyout" Placement="Bottom" ShouldConstrainToRootBounds="False">
                             <MenuFlyout.SystemBackdrop>
@@ -108,7 +108,7 @@
                     <Image Source="ms-appx:///Assets/Clippy/Clippy.png" Height="{x:Bind Settings.ClippySize, Mode=OneWay}" Width="{x:Bind Settings.ClippySize, Mode=OneWay}"/>
                 </ToggleButton>
             </Grid>
-            <Grid Grid.Row="2" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}"  VerticalAlignment="Bottom" HorizontalAlignment="Stretch">
+            <Grid x:Name="ChatInputPanel" Grid.Row="2" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}"  VerticalAlignment="Bottom" HorizontalAlignment="Stretch">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="auto" />
                     <RowDefinition Height="36" />
@@ -121,18 +121,12 @@
                                 <ColumnDefinition Width="auto" />
                             </Grid.ColumnDefinitions>
                             <ToolkitControls:DropShadowPanel Grid.Column="0" ShadowOpacity="0.4" Color="Black" OffsetX="4" CornerRadius="8" OffsetY="4">
-                                <TextBox Text="{x:Bind Clippy.CurrentText, Mode=TwoWay}" PreviewKeyDown="TextBox_PreviewKeyDown" KeyUp="TextBox_KeyUp" Style="{ThemeResource GlowTextBox}" PlaceholderText="Ask me anything.." Width="278" MaxHeight="300" VerticalAlignment="Bottom" AcceptsReturn="True" TextWrapping="Wrap" MaxLength="1000"/>
+                                <TextBox Text="{x:Bind Clippy.CurrentText, Mode=TwoWay}" PreviewKeyDown="TextBox_PreviewKeyDown" Style="{ThemeResource GlowTextBox}" PlaceholderText="Ask me anything.." Width="278" MaxHeight="300" VerticalAlignment="Bottom" AcceptsReturn="True" TextWrapping="Wrap" MaxLength="1000"/>
                             </ToolkitControls:DropShadowPanel>
                             <Button Grid.Column="1" Command="{x:Bind Clippy.SendPromptCommand, Mode=OneWay}" Visibility="{x:Bind InvertBoolToVis(Clippy.SendPromptCommand.IsRunning), Mode=OneWay}" VerticalAlignment="Bottom" Style="{ThemeResource ToolbarButton}">
-                                <Button.KeyboardAccelerators>
-                                    <KeyboardAccelerator Modifiers="None" Key="Enter" />
-                                </Button.KeyboardAccelerators>
                                 <icons:FluentSymbolIcon Symbol="Send20"/>
                             </Button>
                             <Button Grid.Column="1" Command="{x:Bind Clippy.SendPromptCancelCommand, Mode=OneWay}" Visibility="{x:Bind BoolToVis(Clippy.SendPromptCommand.IsRunning), Mode=OneWay}" VerticalAlignment="Bottom" Style="{ThemeResource ToolbarButton}">
-                                <Button.KeyboardAccelerators>
-                                    <KeyboardAccelerator Modifiers="None" Key="Enter" />
-                                </Button.KeyboardAccelerators>
                                 <icons:FluentSymbolIcon Symbol="Stop20Filled" />
                             </Button>
                         </Grid>

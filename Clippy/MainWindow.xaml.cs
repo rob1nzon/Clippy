@@ -58,6 +58,9 @@ namespace Clippy
         private ClippyViewModel Clippy = App.Current.Services.GetService<ClippyViewModel>();
         WindowMessageMonitor m;
         private TrayService tray;
+        private WindowInputRegion inputRegion;
+        private bool toolDialogOpen;
+        private bool contextMenuOpen;
 
         public MainWindow()
         {
@@ -71,26 +74,22 @@ namespace Clippy
 				SetWindowLong(hwnd, GWL_EXSTYLE, lExStyle | WS_EX_LAYERED);
 			}
             m.WindowMessageReceived += WindowMessageReceived;
+            inputRegion = new WindowInputRegion(this.GetWindowHandle());
+            Background.LayoutUpdated += (_, _) => UpdateInputRegion();
+            Flyout.Opened += (_, _) => { contextMenuOpen = true; UpdateInputRegion(); };
+            Flyout.Closed += (_, _) => { contextMenuOpen = false; UpdateInputRegion(); };
 
             SystemBackdrop = new TransparentBackdrop();
-            Content.Background = new SolidColorBrush(Colors.Red);
             Content.Background = new SolidColorBrush(Colors.Transparent);
 
             ClippyKeyboardListener.Setup(this);
 
-            Collapse();
+            PositionInCorner();
 
             this.BringToFront();
 			if (Clippy.IsPinned) Pin();
 			else Unpin();
-            Clippy.PropertyChanged += (object sender, System.ComponentModel.PropertyChangedEventArgs e) =>
-            {
-                if(e.PropertyName == "IsPinned")
-                {
-                    if (Clippy.IsPinned) Pin();
-                    else Unpin();
-                }
-            };
+            Clippy.PropertyChanged += ClippyChanged;
             tray = new TrayService(this.GetWindowHandle(), () => App.Current.ShowClippy(),
                 () => this.Hide(), () => App.Current.OpenSettings(), () => App.Current.ExitApplication());
             tray.SetVisible(Settings.TrayClippy);
@@ -106,12 +105,24 @@ namespace Clippy
             Closed += (_, _) =>
             {
                 Settings.PropertyChanged -= SettingsChanged;
+                Clippy.PropertyChanged -= ClippyChanged;
                 DisposeTray();
                 m.Dispose();
             };
         }
 
         public void DisposeTray() => tray?.Dispose();
+
+        private void ClippyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(Clippy.IsPinned))
+            {
+                if (Clippy.IsPinned) Pin(); else Unpin();
+            }
+            // x:Bind updates the VM after Checked/Unchecked can fire. Resize only
+            // once the actual state changed, otherwise the collapsed UI leaves a large HWND.
+            if (e.PropertyName == nameof(Clippy.IsClippyEnabled)) PositionInCorner();
+        }
 
         public async Task<bool> ConfirmToolCallAsync(string name, string arguments, CancellationToken cancellationToken)
         {
@@ -129,10 +140,16 @@ namespace Clippy
                 PrimaryButtonText = "Run tool", CloseButtonText = "Decline",
                 DefaultButton = ContentDialogButton.Close
             };
-            using var registration = cancellationToken.Register(() => DispatcherQueue.TryEnqueue(() => dialog.Hide()));
-            var result = await dialog.ShowAsync();
-            cancellationToken.ThrowIfCancellationRequested();
-            return result == ContentDialogResult.Primary;
+            toolDialogOpen = true;
+            UpdateInputRegion();
+            try
+            {
+                using var registration = cancellationToken.Register(() => DispatcherQueue.TryEnqueue(() => dialog.Hide()));
+                var result = await dialog.ShowAsync();
+                cancellationToken.ThrowIfCancellationRequested();
+                return result == ContentDialogResult.Primary;
+            }
+            finally { toolDialogOpen = false; UpdateInputRegion(); }
         }
 
         private void SettingsChanged(object sender, PropertyChangedEventArgs e)
@@ -195,6 +212,7 @@ namespace Clippy
                 Clippy.IsClippyEnabled ? 1000 : Settings.ClippySize + 16);
             AppWindow.MoveAndResize(new RectInt32(bounds.X, bounds.Y, bounds.Width, bounds.Height), display);
             Content.MaxHeight = bounds.Height / scale;
+            DispatcherQueue.TryEnqueue(UpdateInputRegion);
         }
 
         private void Settings_Click(object sender, RoutedEventArgs e)
@@ -203,19 +221,53 @@ namespace Clippy
         }
 
         private Visibility BtoV(bool b) => b ? Visibility.Visible : Visibility.Collapsed;
+        private Visibility ChatBackgroundVisibility(bool expanded, bool translucent) => BtoV(expanded && translucent);
 
-        private void Clippy_Checked(object sender, RoutedEventArgs e) => Expand();
+        private Rect VisualBounds(FrameworkElement element) => element.TransformToVisual(Background)
+            .TransformBounds(new Rect(0, 0, element.ActualWidth, element.ActualHeight));
 
-        private void Clippy_Unchecked(object sender, RoutedEventArgs e) => Collapse();
-
-        private void Collapse()
+        private void UpdateInputRegion()
         {
-            PositionInCorner();
-        }
-
-        private void Expand()
-        {
-            PositionInCorner();
+            if (inputRegion == null || ClippyButton.ActualWidth <= 0 || Background.ActualWidth <= 0) return;
+            if (toolDialogOpen || contextMenuOpen)
+            {
+                inputRegion.RestoreFullWindow();
+                return;
+            }
+            var scale = this.GetDpiForWindow() / 96d;
+            var areas = new List<WindowInputRegion.PixelArea>();
+            void AddArea(Rect rect, double padding = 0)
+            {
+                var left = Math.Max(0, rect.Left - padding);
+                var top = Math.Max(0, rect.Top - padding);
+                var right = Math.Min(Background.ActualWidth, rect.Right + padding);
+                var bottom = Math.Min(Background.ActualHeight, rect.Bottom + padding);
+                if (right <= left || bottom <= top) return;
+                var x = (int)Math.Floor(left * scale);
+                var y = (int)Math.Floor(top * scale);
+                areas.Add(new WindowInputRegion.PixelArea(x, y, (int)Math.Ceiling(right * scale) - x, (int)Math.Ceiling(bottom * scale) - y));
+            }
+            AddArea(VisualBounds(ClippyButton));
+            if (Clippy.IsClippyEnabled)
+            {
+                if (ChatInputPanel.ActualHeight > 0) AddArea(VisualBounds(ChatInputPanel), 8);
+                var viewport = VisualBounds(MessagesList);
+                var top = double.PositiveInfinity;
+                var bottom = double.NegativeInfinity;
+                // Don't include the ListView's large, empty viewport above the messages.
+                for (var index = 0; index < MessagesList.Items.Count; index++)
+                {
+                    if (MessagesList.ContainerFromIndex(index) is not FrameworkElement item || item.ActualHeight <= 0) continue;
+                    var rect = VisualBounds(item);
+                    var visibleTop = Math.Max(viewport.Top, rect.Top);
+                    var visibleBottom = Math.Min(viewport.Bottom, rect.Bottom);
+                    if (visibleBottom <= visibleTop) continue;
+                    top = Math.Min(top, visibleTop);
+                    bottom = Math.Max(bottom, visibleBottom);
+                }
+                if (bottom > top) AddArea(new Rect(viewport.X, top, viewport.Width, bottom - top), 8);
+            }
+            inputRegion.SetAreas(areas);
         }
 
 		// Bool to Visibility
@@ -224,38 +276,17 @@ namespace Clippy
 		// Bool to inverted visibility
 		public Visibility InvertBoolToVis(bool b) => b ? Visibility.Collapsed : Visibility.Visible;
 
-		private void Background_PointerPressed(object sender, PointerRoutedEventArgs e) => ClippyInputHelper.PointerPress(this.GetWindowHandle());
-
-        private void Background_PointerMoved(object sender, PointerRoutedEventArgs e) => ClippyInputHelper.PointerHover(this.GetWindowHandle());
-
-		private void TextBox_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
-		{
-			// NOTE - AcceptsReturn is set to true in XAML.
-			/*if (e.Key == VirtualKey.Enter)
-			{
-				// If SHIFT is pressed, this next IF is skipped over, so the default behavior of "AcceptsReturn" is used.
-				var keyState = CoreWindow.GetForCurrentThread().GetKeyState(VirtualKey.Shift);
-				if ((keyState & CoreVirtualKeyStates.Down) != CoreVirtualKeyStates.Down)
-					e.Handled = true; // Mark the event as handled
-			} */
-		}
-
-		private void TextBox_KeyUp(object sender, KeyRoutedEventArgs e)
-		{
-			/*if (e.Key == VirtualKey.Enter)
-			{
-				// If SHIFT is pressed, this next IF is skipped over, so the default behavior of "AcceptsReturn" is used.
-				var keyState = CoreWindow.GetForCurrentThread().GetKeyState(VirtualKey.Shift);
-				if ((keyState & CoreVirtualKeyStates.Down) != CoreVirtualKeyStates.Down)
-				{
-					// Force update x:Bind text
-					Clippy.CurrentText = (sender as TextBox).Text;
-
-					if (Clippy.SendPromptCommand.CanExecute(this))
-						Clippy.SendPromptCommand.Execute(this);
-				}
-			} */
-		}
+        private async void TextBox_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key != VirtualKey.Enter) return;
+            var shift = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift);
+            if ((shift & CoreVirtualKeyStates.Down) != 0) return;
+            e.Handled = true; // Enter sends; never inserts a newline or triggers Stop.
+            if (Clippy.SendPromptCommand.IsRunning || sender is not TextBox input || string.IsNullOrWhiteSpace(input.Text)) return;
+            Clippy.CurrentText = input.Text; // Flush the latest edit even before x:Bind updates.
+            if (Clippy.SendPromptCommand.CanExecute(null))
+                await Clippy.SendPromptCommand.ExecuteAsync(null);
+        }
 
 		private void Exit_Click(object sender, RoutedEventArgs e) => App.Current.ExitApplication();
 

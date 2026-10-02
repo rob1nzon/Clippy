@@ -53,6 +53,9 @@ Locker; other settings are in `%LOCALAPPDATA%\Clippy\settings.json`.
 New messages use the saved connection immediately. Refresh the chat after changing
 models if you want to start a fresh conversation.
 
+Enter sends a message; Shift+Enter inserts a new line. Empty transparent areas
+around Clippy pass clicks through to the applications underneath.
+
 See the [llama.cpp server documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
 
 ## MCP tools (v0.3.0)

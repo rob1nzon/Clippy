@@ -9,5 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="../../Clippy.Core/Clippy.Core.csproj" />
     <Compile Include="../../Clippy/Services/SettingsStore.cs" Link="SettingsStore.cs" />
+    <Compile Include="../../Clippy/Helpers/WindowInputRegion.cs" Link="WindowInputRegion.cs" />
   </ItemGroup>
 </Project>
