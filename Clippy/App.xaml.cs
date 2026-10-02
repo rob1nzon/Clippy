@@ -80,6 +80,8 @@ namespace Clippy
             services.AddSingleton<IToolService>(provider => new McpToolService(
                 provider.GetRequiredService<ISettingsService>(), () => new KeyService("Clippy.MCP").GetKey()));
             services.AddSingleton<ClippyViewModel>();
+            services.AddSingleton(provider => new ScreenAdviceController(provider.GetRequiredService<ISettingsService>(),
+                ((ChatService)provider.GetRequiredService<IChatService>()).AnalyzeScreenAsync));
 
             return services.BuildServiceProvider();
         }
@@ -119,10 +121,13 @@ namespace Clippy
 
         public bool IsExiting { get; private set; }
 
+        public Task RequestScreenAdviceAsync() => m_window?.RequestScreenAdviceAsync(true) ?? Task.CompletedTask;
+
         public async void ExitApplication()
         {
             if (IsExiting) return;
             IsExiting = true;
+            Services.GetRequiredService<ScreenAdviceController>().Reset();
             Services.GetRequiredService<ClippyViewModel>().SendPromptCommand.Cancel();
             m_window?.DisposeTray();
             try { await ((McpToolService)Services.GetRequiredService<IToolService>()).DisposeAsync(); }

@@ -78,6 +78,37 @@ The client uses the [official MCP C# SDK](https://github.com/modelcontextprotoco
 with the stable `2025-11-25` protocol. See also
 [llama.cpp function calling](https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md).
 
+## Optional screen advice (v0.4.0)
+
+In Settings → **Optional screen advice**, turn the switch on, choose an interval
+(5–60 minutes, default 15), click **Save screen advice** and confirm the screenshot
+warning. **Advice now** tests it immediately while Clippy is visible and its chat
+is collapsed. Switching off stops capture immediately. Changing the model server
+URL also disables the feature; enable it again to consent to the new destination.
+
+Clippy captures only the monitor containing the mascot, scales the image to at
+most 1280 pixels on its longest side, and sends a JPEG to the configured model's
+`/v1/chat/completions` endpoint. Images are held in memory, not saved to disk or
+added to chat history. This request does not use MCP tools. A short Russian tip
+appears beside the mascot for 25 seconds without opening chat or taking focus;
+use × to dismiss it. Repeated tips are suppressed. Hidden Clippy, active chat or
+input, an unavailable/locked desktop and full-screen apps pause captures. After
+a request failure automatic requests pause until a manual retry or settings change.
+
+**Privacy:** the entire selected monitor can include messages, passwords and other
+private data. There is no automatic redaction before sending. The configured server
+may retain screenshots; use only a server you trust. Turning this off cannot retract
+images already sent to the server.
+
+The model must support images. With local llama.cpp GGUF files, load a vision model
+and its matching multimodal projector, for example:
+
+```sh
+llama-server -m vision-model.gguf --mmproj matching-mmproj.gguf --host 0.0.0.0 --port 8080 --alias local-model
+```
+
+See the [llama.cpp multimodal documentation](https://github.com/ggml-org/llama.cpp/blob/master/docs/multimodal.md).
+
 ## Build / download Windows EXE
 
 In your fork, open **Actions → Build Clippy EXE → Run workflow** and select your

@@ -43,6 +43,7 @@
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="auto" />
                 <RowDefinition Height="auto" />
+                <RowDefinition Height="auto" />
             </Grid.RowDefinitions>
             <ListView x:Name="MessagesList" Grid.Row="0" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}" ItemTemplateSelector="{StaticResource MessageTemplateSelector}" SelectionMode="None" ItemsSource="{x:Bind Clippy.MessagesVM, Mode=OneWay}">
                 <ListView.ItemsPanel>
@@ -63,7 +64,23 @@
                     </TransitionCollection>
                 </ListView.ItemContainerTransitions>
             </ListView>
-            <Grid Grid.Row="1">
+            <Border x:Name="AdviceBubble" Grid.Row="1" Visibility="Collapsed" MaxWidth="356" Margin="0,0,0,8"
+                    HorizontalAlignment="Right" Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource MicaBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Совет Скрепки · снимки включены" FontSize="11" Opacity="0.7"/>
+                        <TextBlock x:Name="AdviceText" TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="×" Click="DismissAdvice_Click" VerticalAlignment="Top"
+                            Padding="4,0" ToolTipService.ToolTip="Dismiss advice"/>
+                </Grid>
+            </Border>
+            <Grid Grid.Row="2">
                 <ToggleButton x:Name="ClippyButton" IsChecked="{x:Bind Clippy.IsClippyEnabled, Mode=TwoWay}" Style="{ThemeResource ClippyToggleButton}" Padding="0" HorizontalAlignment="Right">
                     <ToggleButton.ContextFlyout>
                         <MenuFlyout x:Name="Flyout" Placement="Bottom" ShouldConstrainToRootBounds="False">
@@ -108,7 +125,7 @@
                     <Image Source="ms-appx:///Assets/Clippy/Clippy.png" Height="{x:Bind Settings.ClippySize, Mode=OneWay}" Width="{x:Bind Settings.ClippySize, Mode=OneWay}"/>
                 </ToggleButton>
             </Grid>
-            <Grid x:Name="ChatInputPanel" Grid.Row="2" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}"  VerticalAlignment="Bottom" HorizontalAlignment="Stretch">
+            <Grid x:Name="ChatInputPanel" Grid.Row="3" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}"  VerticalAlignment="Bottom" HorizontalAlignment="Stretch">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="auto" />
                     <RowDefinition Height="36" />

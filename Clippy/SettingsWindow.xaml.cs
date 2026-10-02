@@ -35,6 +35,39 @@ namespace Clippy
     public sealed partial class SettingsWindow : WindowEx
     {
         private SettingsService Settings = (SettingsService)App.Current.Services.GetService<ISettingsService>();
+        private ScreenAdviceController Advice = App.Current.Services.GetRequiredService<ScreenAdviceController>();
+
+        private void ScreenAdvice_Toggled(object sender, RoutedEventArgs e)
+        {
+            // Switching off takes effect immediately, even before Save is clicked.
+            if (ScreenAdviceSwitch != null && !ScreenAdviceSwitch.IsOn) Settings.ScreenAdviceEnabled = false;
+        }
+
+        private async void SaveScreenAdvice_Click(object sender, RoutedEventArgs e)
+        {
+            if (double.IsNaN(ScreenAdviceIntervalBox.Value)) return;
+            if (ScreenAdviceSwitch.IsOn && !Settings.ScreenAdviceEnabled)
+            {
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = SettingsPanel.XamlRoot, Title = "Allow automatic screenshots?",
+                    Content = "Clippy will periodically capture the monitor it sits on and send the image to:\n" + Settings.ServerUrl +
+                        "\n\nThe screenshot can include passwords, messages, documents and other private data. There is no automatic redaction. The server may retain data. Images stay in memory on this PC and are not saved to disk or added to chat history. A vision model is required. You can disable this at any time; changing the server URL disables it automatically.",
+                    PrimaryButtonText = "Allow screenshots", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close
+                };
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+                { ScreenAdviceSwitch.IsOn = false; return; }
+            }
+            Settings.ScreenAdviceIntervalMinutes = (int)ScreenAdviceIntervalBox.Value;
+            Settings.ScreenAdviceEnabled = ScreenAdviceSwitch.IsOn;
+        }
+
+        private async void AdviceNow_Click(object sender, RoutedEventArgs e)
+        {
+            AdviceNowButton.IsEnabled = false;
+            try { await App.Current.RequestScreenAdviceAsync(); }
+            finally { AdviceNowButton.IsEnabled = true; }
+        }
 
         public SettingsWindow()
         {

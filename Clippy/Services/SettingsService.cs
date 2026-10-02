@@ -88,6 +88,26 @@ namespace Clippy.Services
         }
 
         private int clippySize = Math.Clamp((int)Settings.Get("ClippySize", 100), 60, 200);
+        private bool screenAdviceEnabled = (bool)Settings.Get("ScreenAdviceEnabled", false);
+        public bool ScreenAdviceEnabled
+        {
+            get => screenAdviceEnabled;
+            set { Settings.Values["ScreenAdviceEnabled"] = value; Settings.Save(); SetProperty(ref screenAdviceEnabled, value); }
+        }
+
+        private int screenAdviceIntervalMinutes = Math.Clamp((int)Settings.Get("ScreenAdviceIntervalMinutes", 15), 5, 60);
+        public int ScreenAdviceIntervalMinutes
+        {
+            get => screenAdviceIntervalMinutes;
+            set
+            {
+                value = Math.Clamp(value, 5, 60);
+                Settings.Values["ScreenAdviceIntervalMinutes"] = value;
+                Settings.Save();
+                SetProperty(ref screenAdviceIntervalMinutes, value);
+            }
+        }
+
         public int ClippySize
         {
             get => clippySize;
@@ -104,7 +124,12 @@ namespace Clippy.Services
         public string ServerUrl
         {
             get => serverUrl;
-            set { Settings.Values["ServerUrl"] = value; Settings.Save(); SetProperty(ref serverUrl, value); }
+            set
+            {
+                // Screenshot consent applies only to the endpoint displayed at opt-in.
+                if (value != serverUrl && ScreenAdviceEnabled) ScreenAdviceEnabled = false;
+                Settings.Values["ServerUrl"] = value; Settings.Save(); SetProperty(ref serverUrl, value);
+            }
         }
 
         private string model = (string)Settings.Get("Model", "local-model");

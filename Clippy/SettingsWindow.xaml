@@ -81,6 +81,20 @@
                         <TextBlock x:Name="McpStatus" TextWrapping="Wrap"/>
                     </StackPanel>
                     <TextBlock FontSize="14" FontWeight="SemiBold" Margin="4, 28, 4, 2">Clippy Options</TextBlock>
+                    <StackPanel Spacing="12" Margin="4,12,4,20">
+                        <ToggleSwitch x:Name="ScreenAdviceSwitch" Header="Optional screen advice" IsOn="{x:Bind Settings.ScreenAdviceEnabled, Mode=OneWay}" Toggled="ScreenAdvice_Toggled"/>
+                        <NumberBox x:Name="ScreenAdviceIntervalBox" Header="Capture interval (minutes)" Value="{x:Bind Settings.ScreenAdviceIntervalMinutes, Mode=OneWay}"
+                                   Minimum="5" Maximum="60" SmallChange="5" SpinButtonPlacementMode="Inline"/>
+                        <TextBlock Text="Off by default. Sends a screenshot of the monitor containing Clippy to your configured model server. Requires a vision model (llama.cpp: matching --mmproj). Screenshots may contain private data; there is no automatic redaction. Nothing is saved to disk or added to chat history. Hidden Clippy, active chat, lock screen and full-screen apps pause capture. Advice disappears after 25 seconds."
+                                   TextWrapping="Wrap"/>
+                        <TextBlock Text="Screenshot destination:"/>
+                        <TextBlock Text="{x:Bind Settings.ServerUrl, Mode=OneWay}" TextWrapping="Wrap"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Save screen advice" Click="SaveScreenAdvice_Click"/>
+                            <Button x:Name="AdviceNowButton" Content="Advice now" Click="AdviceNow_Click"/>
+                        </StackPanel>
+                        <TextBlock Text="{x:Bind Advice.Status, Mode=OneWay}" TextWrapping="Wrap"/>
+                    </StackPanel>
                    <!-- <settings:SettingsBlockControl Title="Maximum tokens" Margin="2" Description="Maximum amount of tokens to use for Clippy input + output per prompt. (1 token = 2-3 words)">
                         <settings:SettingsBlockControl.Icon>
                             <icons:FluentIconElement VerticalAlignment="Center" Symbol="TextWordCount24"/>

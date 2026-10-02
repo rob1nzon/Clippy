@@ -103,11 +103,17 @@ try
     var path = Path.Combine(tempDir, "settings.json");
     var store = new SettingsStore(path);
     Assert((string)store.Get("ServerUrl", "default") == "default", "first launch settings defaults");
+    Assert(!(bool)store.Get("ScreenAdviceEnabled", false) && (int)store.Get("ScreenAdviceIntervalMinutes", 15) == 15,
+        "screen advice defaults off with fifteen minute interval");
+    store.Values["ScreenAdviceEnabled"] = true;
+    store.Values["ScreenAdviceIntervalMinutes"] = 30;
     store.Values["ServerUrl"] = "http://192.168.1.20:8080/v1";
     store.Values["Tokens"] = 1024;
     store.Values["AutoPin"] = false;
     store.Save();
     var reloaded = new SettingsStore(path);
+    Assert((bool)reloaded.Get("ScreenAdviceEnabled", false) && (int)reloaded.Get("ScreenAdviceIntervalMinutes", 15) == 30,
+        "screen advice consent and interval survive restart");
     Assert((string)reloaded.Get("ServerUrl", "") == "http://192.168.1.20:8080/v1" &&
         (int)reloaded.Get("Tokens", 512) == 1024 && !(bool)reloaded.Get("AutoPin", true), "settings survive restart");
     File.WriteAllText(path, "{\"Tokens\":\"wrong type\"}");
@@ -166,6 +172,7 @@ mcpSettings.McpEnabled = false;
 Assert((await mcp.ListToolsAsync()).Count == 0, "disabled MCP has no tools");
 await Throws<InvalidOperationException>(() => mcp.CallToolAsync("echo", "{}"), "disabled MCP cannot execute tools");
 Console.WriteLine("All MCP checks passed.");
+await ScreenAdviceChecks.Run(Assert);
 if (OperatingSystem.IsWindows()) WindowRegionChecks.Run(Assert);
 
 sealed class Settings : ISettingsService
@@ -180,6 +187,8 @@ sealed class Settings : ISettingsService
     public string McpServerUrl { get; set; } = "http://localhost:3001/mcp";
     public string ServerUrl { get; set; } = "http://192.168.1.10:8080";
     public string Model { get; set; } = "local-model";
+    public bool ScreenAdviceEnabled { get; set; }
+    public int ScreenAdviceIntervalMinutes { get; set; } = 15;
 }
 
 sealed class Keys : IKeyService

@@ -61,6 +61,9 @@ namespace Clippy
         private WindowInputRegion inputRegion;
         private bool toolDialogOpen;
         private bool contextMenuOpen;
+        private readonly ScreenAdviceController advice = App.Current.Services.GetRequiredService<ScreenAdviceController>();
+        private readonly DispatcherTimer adviceTimer = new() { Interval = TimeSpan.FromSeconds(30) };
+        private readonly DispatcherTimer adviceDismissTimer = new() { Interval = TimeSpan.FromSeconds(25) };
 
         public MainWindow()
         {
@@ -90,8 +93,13 @@ namespace Clippy
 			if (Clippy.IsPinned) Pin();
 			else Unpin();
             Clippy.PropertyChanged += ClippyChanged;
+            advice.PropertyChanged += AdviceChanged;
+            advice.Reset();
+            adviceTimer.Tick += async (_, _) => await RequestScreenAdviceAsync(false);
+            adviceDismissTimer.Tick += (_, _) => advice.Dismiss();
+            adviceTimer.Start();
             tray = new TrayService(this.GetWindowHandle(), () => App.Current.ShowClippy(),
-                () => this.Hide(), () => App.Current.OpenSettings(), () => App.Current.ExitApplication());
+                HideClippy, () => App.Current.OpenSettings(), () => App.Current.ExitApplication());
             tray.SetVisible(Settings.TrayClippy);
             Settings.PropertyChanged += SettingsChanged;
             AppWindow.Closing += (_, args) =>
@@ -99,13 +107,17 @@ namespace Clippy
                 if (Settings.TrayClippy && !App.Current.IsExiting)
                 {
                     args.Cancel = true;
-                    this.Hide();
+                    HideClippy();
                 }
             };
             Closed += (_, _) =>
             {
                 Settings.PropertyChanged -= SettingsChanged;
                 Clippy.PropertyChanged -= ClippyChanged;
+                advice.PropertyChanged -= AdviceChanged;
+                adviceTimer.Stop();
+                adviceDismissTimer.Stop();
+                advice.Reset();
                 DisposeTray();
                 m.Dispose();
             };
@@ -113,8 +125,37 @@ namespace Clippy
 
         public void DisposeTray() => tray?.Dispose();
 
+        public Task RequestScreenAdviceAsync(bool manual)
+        {
+            var handle = this.GetWindowHandle();
+            var allowed = !App.Current.IsExiting && ScreenCaptureService.IsVisible(handle) &&
+                !Clippy.IsClippyEnabled && !Clippy.SendPromptCommand.IsRunning && string.IsNullOrEmpty(Clippy.CurrentText) &&
+                !toolDialogOpen && !contextMenuOpen && (manual || !ScreenCaptureService.IsOurForegroundWindow());
+            return advice.RunAsync(token => ScreenCaptureService.CaptureJpegAsync(handle, token), allowed, manual);
+        }
+
+        private void AdviceChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(advice.Tip)) return;
+            adviceDismissTimer.Stop();
+            AdviceText.Text = advice.Tip;
+            AdviceBubble.Visibility = string.IsNullOrEmpty(advice.Tip) ? Visibility.Collapsed : Visibility.Visible;
+            PositionInCorner();
+            if (AdviceBubble.Visibility == Visibility.Visible) adviceDismissTimer.Start();
+        }
+
+        private void DismissAdvice_Click(object sender, RoutedEventArgs e) => advice.Dismiss();
+
+        private void HideClippy()
+        {
+            advice.Reset();
+            this.Hide();
+        }
+
         private void ClippyChanged(object sender, PropertyChangedEventArgs e)
         {
+            if ((e.PropertyName == nameof(Clippy.CurrentText) && !string.IsNullOrEmpty(Clippy.CurrentText)) ||
+                (e.PropertyName == nameof(Clippy.IsClippyEnabled) && Clippy.IsClippyEnabled)) advice.Reset();
             if (e.PropertyName == nameof(Clippy.IsPinned))
             {
                 if (Clippy.IsPinned) Pin(); else Unpin();
@@ -154,6 +195,8 @@ namespace Clippy
 
         private void SettingsChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(Settings.ScreenAdviceEnabled) || e.PropertyName == nameof(Settings.ScreenAdviceIntervalMinutes) ||
+                e.PropertyName == nameof(Settings.ServerUrl) || e.PropertyName == nameof(Settings.Model)) advice.Reset();
             if (e.PropertyName == nameof(Settings.TrayClippy)) tray.SetVisible(Settings.TrayClippy);
             if (e.PropertyName == nameof(Settings.ClippySize)) PositionInCorner();
         }
@@ -208,8 +251,8 @@ namespace Clippy
             var work = display.WorkArea;
             var scale = this.GetDpiForWindow() / 96d;
             var bounds = CornerPlacement.Calculate(work.X, work.Y, work.Width, work.Height, scale,
-                Clippy.IsClippyEnabled ? Math.Max(380, Settings.ClippySize + 24) : Settings.ClippySize + 24,
-                Clippy.IsClippyEnabled ? 1000 : Settings.ClippySize + 16);
+                Clippy.IsClippyEnabled || AdviceBubble.Visibility == Visibility.Visible ? Math.Max(380, Settings.ClippySize + 24) : Settings.ClippySize + 24,
+                Clippy.IsClippyEnabled ? 1000 : Settings.ClippySize + 16 + (AdviceBubble.Visibility == Visibility.Visible ? 148 : 0));
             AppWindow.MoveAndResize(new RectInt32(bounds.X, bounds.Y, bounds.Width, bounds.Height), display);
             Content.MaxHeight = bounds.Height / scale;
             DispatcherQueue.TryEnqueue(UpdateInputRegion);
@@ -248,6 +291,7 @@ namespace Clippy
                 areas.Add(new WindowInputRegion.PixelArea(x, y, (int)Math.Ceiling(right * scale) - x, (int)Math.Ceiling(bottom * scale) - y));
             }
             AddArea(VisualBounds(ClippyButton));
+            if (AdviceBubble.Visibility == Visibility.Visible) AddArea(VisualBounds(AdviceBubble), 4);
             if (Clippy.IsClippyEnabled)
             {
                 if (ChatInputPanel.ActualHeight > 0) AddArea(VisualBounds(ChatInputPanel), 8);
@@ -292,7 +336,7 @@ namespace Clippy
 
 		private void Hide_Click(object sender, RoutedEventArgs e)
 		{
-            this.Hide();
+            HideClippy();
 		}
 	}
 }
