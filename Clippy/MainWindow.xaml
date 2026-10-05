@@ -157,6 +157,9 @@
                     </Button>
                     <ToggleButton IsChecked="{x:Bind Clippy.IsPinned, Mode=TwoWay}" Style="{ThemeResource PinToggleButton}" Height="32" Width="40"/>
                     <Button Command="{x:Bind Clippy.RefreshChatCommand}" Style="{ThemeResource RefreshButton}" Height="32" Width="40"/>
+                    <Button x:Name="AdviceNowButton" Content="Advice now" Click="AdviceNow_Click" Height="32" Padding="8,0"
+                            IsEnabled="{x:Bind CanRequestAdvice(Settings.ScreenAdviceEnabled, advice.IsRunning, Clippy.SendPromptCommand.IsRunning, Clippy.CurrentText), Mode=OneWay}"
+                            ToolTipService.ToolTip="Совет по экрану сейчас. Включите Screen advice в настройках; завершите ответ и очистите ввод."/>
                 </StackPanel>
             </Grid>
         </Grid>

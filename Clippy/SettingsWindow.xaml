@@ -85,7 +85,7 @@
                         <ToggleSwitch x:Name="ScreenAdviceSwitch" Header="Optional screen advice" IsOn="{x:Bind Settings.ScreenAdviceEnabled, Mode=OneWay}" Toggled="ScreenAdvice_Toggled"/>
                         <NumberBox x:Name="ScreenAdviceIntervalBox" Header="Capture interval (minutes)" Value="{x:Bind Settings.ScreenAdviceIntervalMinutes, Mode=OneWay}"
                                    Minimum="5" Maximum="60" SmallChange="5" SpinButtonPlacementMode="Inline"/>
-                        <TextBlock Text="Off by default. Sends a screenshot of the monitor containing Clippy to your configured model server. Requires a vision model (llama.cpp: matching --mmproj). Screenshots may contain private data; there is no automatic redaction. Nothing is saved to disk or added to chat history. Hidden Clippy, active chat, lock screen and full-screen apps pause capture. Advice disappears after 25 seconds."
+                        <TextBlock Text="Off by default. Sends a screenshot of the monitor containing Clippy to your configured model server. Requires a vision model (llama.cpp: matching --mmproj). Screenshots may contain private data; there is no automatic redaction. Nothing is saved to disk or added to chat history. Automatic capture pauses while chat is open. Advice now also works from the chat toolbar when input is empty and no response is running. Hidden Clippy, lock screen and full-screen apps pause all capture. Advice disappears after 25 seconds."
                                    TextWrapping="Wrap"/>
                         <TextBlock Text="Screenshot destination:"/>
                         <TextBlock Text="{x:Bind Settings.ServerUrl, Mode=OneWay}" TextWrapping="Wrap"/>

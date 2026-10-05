@@ -129,7 +129,7 @@ namespace Clippy
         {
             var handle = this.GetWindowHandle();
             var allowed = !App.Current.IsExiting && ScreenCaptureService.IsVisible(handle) &&
-                !Clippy.IsClippyEnabled && !Clippy.SendPromptCommand.IsRunning && string.IsNullOrEmpty(Clippy.CurrentText) &&
+                (manual || !Clippy.IsClippyEnabled) && !Clippy.SendPromptCommand.IsRunning && string.IsNullOrEmpty(Clippy.CurrentText) &&
                 !toolDialogOpen && !contextMenuOpen && (manual || !ScreenCaptureService.IsOurForegroundWindow());
             return advice.RunAsync(token => ScreenCaptureService.CaptureJpegAsync(handle, token), allowed, manual);
         }
@@ -145,6 +145,11 @@ namespace Clippy
         }
 
         private void DismissAdvice_Click(object sender, RoutedEventArgs e) => advice.Dismiss();
+
+        private bool CanRequestAdvice(bool enabled, bool adviceRunning, bool chatRunning, string draft) =>
+            enabled && !adviceRunning && !chatRunning && string.IsNullOrEmpty(draft);
+
+        private async void AdviceNow_Click(object sender, RoutedEventArgs e) => await RequestScreenAdviceAsync(true);
 
         private void HideClippy()
         {

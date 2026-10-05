@@ -82,8 +82,10 @@ with the stable `2025-11-25` protocol. See also
 
 In Settings → **Optional screen advice**, turn the switch on, choose an interval
 (5–60 minutes, default 15), click **Save screen advice** and confirm the screenshot
-warning. **Advice now** tests it immediately while Clippy is visible and its chat
-is collapsed. Switching off stops capture immediately. Changing the model server
+warning. **Advice now** tests it immediately while Clippy is visible, the input is
+empty and no response is running. Since v0.4.1 this button is also beside the chat
+reset button, and manual advice works with chat open. Automatic captures still pause
+while chat is open. Switching off stops capture immediately. Changing the model server
 URL also disables the feature; enable it again to consent to the new destination.
 
 Clippy captures only the monitor containing the mascot, scales the image to at
