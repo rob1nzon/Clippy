@@ -195,8 +195,8 @@ namespace Clippy
                     ScreenshotStatus.Text = "Экран недоступен: блокировка или полноэкранное приложение.";
                     return;
                 }
-                using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
-                using var writer = new Windows.Storage.Streams.DataWriter(stream);
+                using var stream = new global::Windows.Storage.Streams.InMemoryRandomAccessStream();
+                using var writer = new global::Windows.Storage.Streams.DataWriter(stream);
                 writer.WriteBytes(jpeg);
                 await writer.StoreAsync().AsTask(cancellation.Token);
                 writer.DetachStream();
