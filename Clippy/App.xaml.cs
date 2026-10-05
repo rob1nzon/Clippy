@@ -107,6 +107,7 @@ namespace Clippy
 			m_window.Activate();
             m_window.Show();
             m_window.SetForegroundWindow();
+            m_window.OpenChatAndFocus();
         }
 
         public void OpenSettings()

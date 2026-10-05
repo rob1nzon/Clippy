@@ -32,6 +32,15 @@ namespace Clippy.Core.ViewModels
 		[ObservableProperty]
 		private string currentText = "";
 
+        [ObservableProperty]
+        private byte[]? currentScreenshot;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(SendPromptCommand))]
+        private bool isCapturingScreenshot;
+
+        public int ConversationRevision { get; private set; }
+
 		[ObservableProperty]
 		private DateTime updatedAt = DateTime.Now;
 
@@ -49,8 +58,7 @@ namespace Clippy.Core.ViewModels
 
 		private void SetupChat()
 		{
-			AddMessage(new Message(Role.System, Constants.DEFAULT_SYSTEM_PROMPT));
-			AddMessage(new Message(Role.Assistant, Constants.FIRST_CLIPPY_MESSAGE));
+			Messages.Add(new Message(Role.System, Constants.DEFAULT_SYSTEM_PROMPT));
 		}
 
 		private MessageViewModel AddMessage(IMessage message)
@@ -61,14 +69,20 @@ namespace Clippy.Core.ViewModels
 			return ViewModel;
 		}
 
-		[RelayCommand(IncludeCancelCommand = true)]
+        private bool CanSendPrompt() => !IsCapturingScreenshot;
+
+		[RelayCommand(IncludeCancelCommand = true, CanExecute = nameof(CanSendPrompt))]
 		public async Task SendPrompt(CancellationToken cancellationToken)
 		{
 			try
 			{
-				if (!String.IsNullOrEmpty(CurrentText))
+				if (!IsCapturingScreenshot && (!string.IsNullOrWhiteSpace(CurrentText) || CurrentScreenshot != null))
 				{
-					AddMessage(new Message(Role.User, CurrentText)); // update UI here
+                    var userMessage = new Message(Role.User, string.IsNullOrWhiteSpace(CurrentText) ? "Что на этом скриншоте? Дай короткий полезный ответ." : CurrentText)
+                    { ScreenshotJpeg = CurrentScreenshot };
+                    var userVM = AddMessage(userMessage);
+                    if (CurrentScreenshot != null) userVM.MessageText += "\n📷 Скриншот";
+                    CurrentScreenshot = null;
 					CurrentText = "";
 					await Task.Delay(300);
 
@@ -96,6 +110,7 @@ namespace Clippy.Core.ViewModels
 					}
                     finally
                     {
+                        userMessage.ScreenshotJpeg = null;
                         messageVM?.EndStreamText();
                         var index = Messages.IndexOf(assistantMessage);
                         if (messageVM != null && index >= 0)
@@ -112,6 +127,8 @@ namespace Clippy.Core.ViewModels
 		[RelayCommand]
         private void RefreshChat()
 		{
+            ConversationRevision++;
+            CurrentScreenshot = null;
 			MessagesVM.Clear();
 			Messages.Clear();
 			SetupChat();

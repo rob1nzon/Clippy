@@ -43,9 +43,7 @@ namespace Clippy.Helpers
                     IsC = true;
                 if (IsWin && IsC)
                 {
-                    Clippy.Show();
-                    Clippy.SetForegroundWindow();
-                    Clippy.BringToFront();
+                    Clippy.DispatcherQueue.TryEnqueue(() => App.Current.ShowClippy());
                 }
             }
             else if (e.KeyboardState == KeyboardHelper.KeyboardState.KeyUp)

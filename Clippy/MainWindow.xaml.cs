@@ -64,6 +64,8 @@ namespace Clippy
         private readonly ScreenAdviceController advice = App.Current.Services.GetRequiredService<ScreenAdviceController>();
         private readonly DispatcherTimer adviceTimer = new() { Interval = TimeSpan.FromSeconds(30) };
         private readonly DispatcherTimer adviceDismissTimer = new() { Interval = TimeSpan.FromSeconds(25) };
+        private CancellationTokenSource screenshotCapture;
+        private bool isClosed;
 
         public MainWindow()
         {
@@ -98,6 +100,11 @@ namespace Clippy
             adviceTimer.Tick += async (_, _) => await RequestScreenAdviceAsync(false);
             adviceDismissTimer.Tick += (_, _) => advice.Dismiss();
             adviceTimer.Start();
+            Activated += (_, args) =>
+            {
+                if (args.WindowActivationState == WindowActivationState.Deactivated || toolDialogOpen || contextMenuOpen) return;
+                FocusPrompt();
+            };
             tray = new TrayService(this.GetWindowHandle(), () => App.Current.ShowClippy(),
                 HideClippy, () => App.Current.OpenSettings(), () => App.Current.ExitApplication());
             tray.SetVisible(Settings.TrayClippy);
@@ -112,6 +119,8 @@ namespace Clippy
             };
             Closed += (_, _) =>
             {
+                isClosed = true;
+                screenshotCapture?.Cancel();
                 Settings.PropertyChanged -= SettingsChanged;
                 Clippy.PropertyChanged -= ClippyChanged;
                 advice.PropertyChanged -= AdviceChanged;
@@ -125,11 +134,18 @@ namespace Clippy
 
         public void DisposeTray() => tray?.Dispose();
 
+        public void OpenChatAndFocus()
+        {
+            Clippy.IsClippyEnabled = true;
+            FocusPrompt();
+        }
+
         public Task RequestScreenAdviceAsync(bool manual)
         {
             var handle = this.GetWindowHandle();
             var allowed = !App.Current.IsExiting && ScreenCaptureService.IsVisible(handle) &&
-                (manual || !Clippy.IsClippyEnabled) && !Clippy.SendPromptCommand.IsRunning && string.IsNullOrEmpty(Clippy.CurrentText) &&
+                (manual || !Clippy.IsClippyEnabled) && !Clippy.SendPromptCommand.IsRunning && !Clippy.IsCapturingScreenshot &&
+                Clippy.CurrentScreenshot == null && string.IsNullOrEmpty(Clippy.CurrentText) &&
                 !toolDialogOpen && !contextMenuOpen && (manual || !ScreenCaptureService.IsOurForegroundWindow());
             return advice.RunAsync(token => ScreenCaptureService.CaptureJpegAsync(handle, token), allowed, manual);
         }
@@ -146,19 +162,93 @@ namespace Clippy
 
         private void DismissAdvice_Click(object sender, RoutedEventArgs e) => advice.Dismiss();
 
-        private bool CanRequestAdvice(bool enabled, bool adviceRunning, bool chatRunning, string draft) =>
-            enabled && !adviceRunning && !chatRunning && string.IsNullOrEmpty(draft);
+        private bool CanRequestAdvice(bool enabled, bool adviceRunning, bool chatRunning, string draft, bool capturing, byte[] screenshot) =>
+            enabled && !adviceRunning && !chatRunning && !capturing && screenshot == null && string.IsNullOrEmpty(draft);
+
+        private bool CanAttachScreenshot(bool chatRunning, bool capturing, bool adviceRunning) => !chatRunning && !capturing && !adviceRunning;
 
         private async void AdviceNow_Click(object sender, RoutedEventArgs e) => await RequestScreenAdviceAsync(true);
 
+        private void FocusPrompt() => DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            if (!isClosed && !App.Current.IsExiting && Clippy.IsClippyEnabled && !toolDialogOpen && !contextMenuOpen)
+                PromptBox.Focus(FocusState.Programmatic);
+        });
+
+        private async void AttachScreenshot_Click(object sender, RoutedEventArgs e)
+        {
+            if (!CanAttachScreenshot(Clippy.SendPromptCommand.IsRunning, Clippy.IsCapturingScreenshot, advice.IsRunning)) return;
+            var destination = Settings.ServerUrl;
+            var revision = Clippy.ConversationRevision;
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            screenshotCapture = cancellation;
+            Clippy.IsCapturingScreenshot = true;
+            ScreenshotStatus.Text = "Снимаю экран…";
+            ScreenshotStatus.Visibility = Visibility.Visible;
+            try
+            {
+                var jpeg = await ScreenCaptureService.CaptureJpegAsync(this.GetWindowHandle(), cancellation.Token);
+                cancellation.Token.ThrowIfCancellationRequested();
+                if (isClosed || App.Current.IsExiting || destination != Settings.ServerUrl || revision != Clippy.ConversationRevision) return;
+                if (jpeg == null)
+                {
+                    ScreenshotStatus.Text = "Экран недоступен: блокировка или полноэкранное приложение.";
+                    return;
+                }
+                using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+                using var writer = new Windows.Storage.Streams.DataWriter(stream);
+                writer.WriteBytes(jpeg);
+                await writer.StoreAsync().AsTask(cancellation.Token);
+                writer.DetachStream();
+                stream.Seek(0);
+                var preview = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                await preview.SetSourceAsync(stream).AsTask(cancellation.Token);
+                cancellation.Token.ThrowIfCancellationRequested();
+                if (isClosed || App.Current.IsExiting || destination != Settings.ServerUrl || revision != Clippy.ConversationRevision) return;
+                ScreenshotPreview.Source = preview;
+                Clippy.CurrentScreenshot = jpeg;
+                ScreenshotPreviewPanel.Visibility = Visibility.Visible;
+                ScreenshotStatus.Visibility = Visibility.Collapsed;
+            }
+            catch (OperationCanceledException) { if (!isClosed) ScreenshotStatus.Visibility = Visibility.Collapsed; }
+            catch (Exception) { if (!isClosed) ScreenshotStatus.Text = "Не удалось снять экран. Попробуйте ещё раз."; }
+            finally
+            {
+                screenshotCapture = null;
+                Clippy.IsCapturingScreenshot = false;
+                if (!isClosed) FocusPrompt();
+            }
+        }
+
+        private void RemoveScreenshot_Click(object sender, RoutedEventArgs e)
+        {
+            screenshotCapture?.Cancel();
+            Clippy.CurrentScreenshot = null;
+            ScreenshotStatus.Visibility = Visibility.Collapsed;
+            FocusPrompt();
+        }
+
+        private void RefreshChat_Click(object sender, RoutedEventArgs e)
+        {
+            screenshotCapture?.Cancel();
+            ScreenshotStatus.Visibility = Visibility.Collapsed;
+            FocusPrompt();
+        }
+
         private void HideClippy()
         {
+            screenshotCapture?.Cancel();
             advice.Reset();
             this.Hide();
         }
 
         private void ClippyChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(Clippy.CurrentScreenshot) && Clippy.CurrentScreenshot == null)
+            {
+                ScreenshotPreview.Source = null;
+                ScreenshotPreviewPanel.Visibility = Visibility.Collapsed;
+            }
             if ((e.PropertyName == nameof(Clippy.CurrentText) && !string.IsNullOrEmpty(Clippy.CurrentText)) ||
                 (e.PropertyName == nameof(Clippy.IsClippyEnabled) && Clippy.IsClippyEnabled)) advice.Reset();
             if (e.PropertyName == nameof(Clippy.IsPinned))
@@ -167,7 +257,11 @@ namespace Clippy
             }
             // x:Bind updates the VM after Checked/Unchecked can fire. Resize only
             // once the actual state changed, otherwise the collapsed UI leaves a large HWND.
-            if (e.PropertyName == nameof(Clippy.IsClippyEnabled)) PositionInCorner();
+            if (e.PropertyName == nameof(Clippy.IsClippyEnabled))
+            {
+                PositionInCorner();
+                if (Clippy.IsClippyEnabled) FocusPrompt();
+            }
         }
 
         public async Task<bool> ConfirmToolCallAsync(string name, string arguments, CancellationToken cancellationToken)
@@ -200,6 +294,11 @@ namespace Clippy
 
         private void SettingsChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(Settings.ServerUrl))
+            {
+                screenshotCapture?.Cancel();
+                Clippy.CurrentScreenshot = null;
+            }
             if (e.PropertyName == nameof(Settings.ScreenAdviceEnabled) || e.PropertyName == nameof(Settings.ScreenAdviceIntervalMinutes) ||
                 e.PropertyName == nameof(Settings.ServerUrl) || e.PropertyName == nameof(Settings.Model)) advice.Reset();
             if (e.PropertyName == nameof(Settings.TrayClippy)) tray.SetVisible(Settings.TrayClippy);
@@ -276,7 +375,7 @@ namespace Clippy
 
         private void UpdateInputRegion()
         {
-            if (inputRegion == null || ClippyButton.ActualWidth <= 0 || Background.ActualWidth <= 0) return;
+            if (isClosed || inputRegion == null || ClippyButton.ActualWidth <= 0 || Background.ActualWidth <= 0) return;
             if (toolDialogOpen || contextMenuOpen)
             {
                 inputRegion.RestoreFullWindow();
@@ -331,7 +430,7 @@ namespace Clippy
             var shift = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift);
             if ((shift & CoreVirtualKeyStates.Down) != 0) return;
             e.Handled = true; // Enter sends; never inserts a newline or triggers Stop.
-            if (Clippy.SendPromptCommand.IsRunning || sender is not TextBox input || string.IsNullOrWhiteSpace(input.Text)) return;
+            if (Clippy.SendPromptCommand.IsRunning || sender is not TextBox input || (string.IsNullOrWhiteSpace(input.Text) && Clippy.CurrentScreenshot == null)) return;
             Clippy.CurrentText = input.Text; // Flush the latest edit even before x:Bind updates.
             if (Clippy.SendPromptCommand.CanExecute(null))
                 await Clippy.SendPromptCommand.ExecuteAsync(null);

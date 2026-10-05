@@ -56,6 +56,16 @@ models if you want to start a fresh conversation.
 Enter sends a message; Shift+Enter inserts a new line. Empty transparent areas
 around Clippy pass clicks through to the applications underneath.
 
+Since v0.5.0, activating Clippy opens chat and focuses its input. New/reset chats
+have no greeting. The lightbulb beside Reset runs **Advice now**. The screenshot
+icon attaches an image of Clippy's monitor to the next message, with a preview
+and a remove button. Nothing is sent until you press Send/Enter; you can add your
+own question or send just the image with a default prompt. This manual attachment
+does not enable automatic screen advice. It requires a vision model and may contain
+private information. Images are not saved to disk and are released after the request,
+so subsequent messages do not resend them. Resetting chat or changing the server URL
+removes an unsent attachment.
+
 See the [llama.cpp server documentation](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
 
 ## MCP tools (v0.3.0)

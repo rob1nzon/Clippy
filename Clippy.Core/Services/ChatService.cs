@@ -31,8 +31,23 @@ namespace Clippy.Core.Services
         }
 
         private static List<object> WireMessages(IEnumerable<IMessage> messages) => messages
-            .Where(m => !string.IsNullOrWhiteSpace(m.MessageText))
-            .Select(m => (object)new { role = m.Role.ToString().ToLowerInvariant(), content = m.MessageText }).ToList();
+            .Where(m => !string.IsNullOrWhiteSpace(m.MessageText) || m is Clippy.Core.Classes.Message { ScreenshotJpeg: not null })
+            .Select(ToWireMessage).ToList();
+
+        private static object ToWireMessage(IMessage message)
+        {
+            var role = message.Role.ToString().ToLowerInvariant();
+            if (role == "user" && message is Clippy.Core.Classes.Message { ScreenshotJpeg: { } jpeg })
+            {
+                if (jpeg.Length == 0 || jpeg.Length > 4 * 1024 * 1024) throw new ArgumentException("Invalid screenshot size.");
+                return new { role, content = new object[]
+                {
+                    new { type = "text", text = message.MessageText },
+                    new { type = "image_url", image_url = new { url = "data:image/jpeg;base64," + Convert.ToBase64String(jpeg) } }
+                } };
+            }
+            return new { role, content = message.MessageText };
+        }
 
         private HttpRequestMessage CreateRequest(IEnumerable<object> messages, bool stream, IReadOnlyList<ToolDefinition>? tools = null, int? maxTokens = null)
         {

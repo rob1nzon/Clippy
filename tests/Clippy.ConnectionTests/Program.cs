@@ -173,6 +173,7 @@ Assert((await mcp.ListToolsAsync()).Count == 0, "disabled MCP has no tools");
 await Throws<InvalidOperationException>(() => mcp.CallToolAsync("echo", "{}"), "disabled MCP cannot execute tools");
 Console.WriteLine("All MCP checks passed.");
 await ScreenAdviceChecks.Run(Assert);
+await AttachmentChecks.Run(Assert);
 if (OperatingSystem.IsWindows()) WindowRegionChecks.Run(Assert);
 
 sealed class Settings : ISettingsService

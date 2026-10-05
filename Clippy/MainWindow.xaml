@@ -128,9 +128,21 @@
             <Grid x:Name="ChatInputPanel" Grid.Row="3" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}"  VerticalAlignment="Bottom" HorizontalAlignment="Stretch">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="auto" />
+                    <RowDefinition Height="auto" />
                     <RowDefinition Height="36" />
                 </Grid.RowDefinitions>
-                <Grid Grid.Row="0">
+                <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,8">
+                    <Border x:Name="ScreenshotPreviewPanel" Visibility="Collapsed" Padding="8" CornerRadius="8" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        <StackPanel Spacing="4">
+                            <Image x:Name="ScreenshotPreview" Height="100" Stretch="Uniform"/>
+                            <Button Content="Убрать скриншот ×" Click="RemoveScreenshot_Click"/>
+                            <TextBlock Text="Отправится вместе с запросом на:" FontSize="11"/>
+                            <TextBlock Text="{x:Bind Settings.ServerUrl, Mode=OneWay}" FontSize="11" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock x:Name="ScreenshotStatus" Visibility="Collapsed" TextWrapping="Wrap" FontSize="11"/>
+                </StackPanel>
+                <Grid Grid.Row="1">
                     <ToolkitControls:DropShadowPanel BlurRadius="16.0" ShadowOpacity="0.43" IsMasked="True" CornerRadius="8" OffsetX="0.0" OffsetY="0.0" Color="Black">
                         <Grid ColumnSpacing="4" BorderBrush="{ThemeResource MicaBorderBrush}" Padding="8" BorderThickness="1" Background="{ThemeResource MicaBrush}" CornerRadius="8">
                             <Grid.ColumnDefinitions>
@@ -138,7 +150,7 @@
                                 <ColumnDefinition Width="auto" />
                             </Grid.ColumnDefinitions>
                             <ToolkitControls:DropShadowPanel Grid.Column="0" ShadowOpacity="0.4" Color="Black" OffsetX="4" CornerRadius="8" OffsetY="4">
-                                <TextBox Text="{x:Bind Clippy.CurrentText, Mode=TwoWay}" PreviewKeyDown="TextBox_PreviewKeyDown" Style="{ThemeResource GlowTextBox}" PlaceholderText="Ask me anything.." Width="278" MaxHeight="300" VerticalAlignment="Bottom" AcceptsReturn="True" TextWrapping="Wrap" MaxLength="1000"/>
+                                <TextBox x:Name="PromptBox" Text="{x:Bind Clippy.CurrentText, Mode=TwoWay}" PreviewKeyDown="TextBox_PreviewKeyDown" Style="{ThemeResource GlowTextBox}" PlaceholderText="Ask me anything.." Width="278" MaxHeight="300" VerticalAlignment="Bottom" AcceptsReturn="True" TextWrapping="Wrap" MaxLength="1000"/>
                             </ToolkitControls:DropShadowPanel>
                             <Button Grid.Column="1" Command="{x:Bind Clippy.SendPromptCommand, Mode=OneWay}" Visibility="{x:Bind InvertBoolToVis(Clippy.SendPromptCommand.IsRunning), Mode=OneWay}" VerticalAlignment="Bottom" Style="{ThemeResource ToolbarButton}">
                                 <icons:FluentSymbolIcon Symbol="Send20"/>
@@ -149,17 +161,24 @@
                         </Grid>
                     </ToolkitControls:DropShadowPanel>
                 </Grid>
-                <StackPanel Grid.Row="1" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left" VerticalAlignment="Bottom">
+                <StackPanel Grid.Row="2" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left" VerticalAlignment="Bottom">
                     <Button Click="Settings_Click" Foreground="{ThemeResource SystemAccentColorLight2}" Style="{ThemeResource SettingsToolbarButton}"/>
                     <AppBarSeparator/>
                     <Button Click="Hide_Click" Style="{ThemeResource ToolbarButton}" Padding="0" Foreground="{ThemeResource SystemAccentColorLight2}" Height="32" Width="40">
                         <icons:FluentSymbolIcon Symbol="EyeHide20" />
                     </Button>
                     <ToggleButton IsChecked="{x:Bind Clippy.IsPinned, Mode=TwoWay}" Style="{ThemeResource PinToggleButton}" Height="32" Width="40"/>
-                    <Button Command="{x:Bind Clippy.RefreshChatCommand}" Style="{ThemeResource RefreshButton}" Height="32" Width="40"/>
-                    <Button x:Name="AdviceNowButton" Content="Advice now" Click="AdviceNow_Click" Height="32" Padding="8,0"
-                            IsEnabled="{x:Bind CanRequestAdvice(Settings.ScreenAdviceEnabled, advice.IsRunning, Clippy.SendPromptCommand.IsRunning, Clippy.CurrentText), Mode=OneWay}"
-                            ToolTipService.ToolTip="Совет по экрану сейчас. Включите Screen advice в настройках; завершите ответ и очистите ввод."/>
+                    <Button Command="{x:Bind Clippy.RefreshChatCommand}" Click="RefreshChat_Click" Style="{ThemeResource RefreshButton}" Height="32" Width="40"/>
+                    <Button x:Name="AdviceNowButton" Click="AdviceNow_Click" Height="32" Width="40" Style="{ThemeResource ToolbarButton}" AutomationProperties.Name="Advice now"
+                            IsEnabled="{x:Bind CanRequestAdvice(Settings.ScreenAdviceEnabled, advice.IsRunning, Clippy.SendPromptCommand.IsRunning, Clippy.CurrentText, Clippy.IsCapturingScreenshot, Clippy.CurrentScreenshot), Mode=OneWay}"
+                            ToolTipService.ToolTip="Advice now — совет по экрану. Включите Screen advice в настройках; завершите ответ и очистите ввод.">
+                        <icons:FluentSymbolIcon Symbol="Lightbulb20"/>
+                    </Button>
+                    <Button x:Name="AttachScreenshotButton" Click="AttachScreenshot_Click" Height="32" Width="40" Style="{ThemeResource ToolbarButton}"
+                            IsEnabled="{x:Bind CanAttachScreenshot(Clippy.SendPromptCommand.IsRunning, Clippy.IsCapturingScreenshot, advice.IsRunning), Mode=OneWay}"
+                            AutomationProperties.Name="Прикрепить скриншот" ToolTipService.ToolTip="Прикрепить скриншот монитора к следующему сообщению. Нужна vision-модель.">
+                        <icons:FluentSymbolIcon Symbol="Screenshot20"/>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Grid>
