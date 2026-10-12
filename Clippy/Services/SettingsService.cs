@@ -158,6 +158,19 @@ namespace Clippy.Services
         }
 
         private string model = (string)Settings.Get("Model", "local-model");
+        private string systemPrompt = (string)Settings.Get("SystemPrompt", Clippy.Core.Constants.DEFAULT_SYSTEM_PROMPT);
+        public string SystemPrompt
+        {
+            get => systemPrompt;
+            set
+            {
+                value ??= "";
+                Settings.Values["SystemPrompt"] = value;
+                Settings.Save();
+                SetProperty(ref systemPrompt, value);
+            }
+        }
+
         public string Model
         {
             get => model;

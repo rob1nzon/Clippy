@@ -71,6 +71,7 @@ namespace Clippy
         public MainWindow()
         {
             this.InitializeComponent();
+            AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "Clippy", "Clippy.ico"));
             m = new(this);
             unsafe
             {

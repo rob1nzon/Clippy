@@ -6,6 +6,7 @@
     <SupportedOSPlatformVersion>10.0.18362.0</SupportedOSPlatformVersion>
     <RootNamespace>Clippy</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Clippy\Clippy.ico</ApplicationIcon>
     <Platforms>x86;x64;arm64</Platforms>
     <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
     <WindowsPackageType>None</WindowsPackageType>
@@ -34,6 +35,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Remove="Assets\Clippy\Clippy.png" />
+    <Content Remove="Assets\Clippy\Clippy.ico" />
+    <None Remove="Assets\Clippy\Clippy.ico" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Controls\APIBox.xaml" />
@@ -121,7 +124,7 @@
     <PRIResource Remove="AppPackagesSideloading\**" />
   </ItemGroup>
   <ItemGroup>
-    <Content Update="Assets\Clippy\Clippy.ico">
+    <Content Include="Assets\Clippy\Clippy.ico">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

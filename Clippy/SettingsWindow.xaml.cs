@@ -36,6 +36,42 @@ namespace Clippy
     {
         private SettingsService Settings = (SettingsService)App.Current.Services.GetService<ISettingsService>();
         private ScreenAdviceController Advice = App.Current.Services.GetRequiredService<ScreenAdviceController>();
+        private readonly StartupService startup = new();
+        private bool startupReady;
+
+        private void StartupToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (!startupReady) return;
+            try
+            {
+                startup.SetEnabled(StartupToggle.IsOn);
+                StartupErrorText.Visibility = Visibility.Collapsed;
+            }
+            catch (Exception)
+            {
+                startupReady = false;
+                try { StartupToggle.IsOn = startup.IsEnabled; } catch { StartupToggle.IsOn = false; }
+                startupReady = true;
+                StartupErrorText.Text = "Не удалось изменить автозагрузку. Проверьте доступ к реестру и путь к Clippy.exe.";
+                StartupErrorText.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void SaveSystemPrompt_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Settings.SystemPrompt = SystemPromptBox.Text;
+                SystemPromptStatus.Text = "Сохранено. Применится со следующего сообщения.";
+            }
+            catch (Exception) { SystemPromptStatus.Text = "Не удалось сохранить prompt."; }
+        }
+
+        private void ResetSystemPrompt_Click(object sender, RoutedEventArgs e)
+        {
+            SystemPromptBox.Text = global::Clippy.Core.Constants.DEFAULT_SYSTEM_PROMPT;
+            SaveSystemPrompt_Click(sender, e);
+        }
 
         private void VoiceInput_Toggled(object sender, RoutedEventArgs e)
         {
@@ -97,14 +133,20 @@ namespace Clippy
         public SettingsWindow()
         {
             this.InitializeComponent();
+            AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "Clippy", "Clippy.ico"));
             this.ExtendsContentIntoTitleBar = true;
             SetTitleBar(AppTitleBar);
             ServerKeyBox.Password = App.Current.Services.GetRequiredService<IKeyService>().GetKey();
             McpKeyBox.Password = new KeyService("Clippy.MCP").GetKey();
             SpeechKeyBox.Password = new KeyService("Clippy.Speech").GetKey();
-            StartupToggle.IsEnabled = false;
-            StartupErrorText.Text = "For this EXE, add a shortcut to shell:startup to run on login.";
-            StartupErrorText.Visibility = Visibility.Visible;
+            try { StartupToggle.IsOn = startup.IsEnabled; }
+            catch (Exception)
+            {
+                StartupToggle.IsEnabled = false;
+                StartupErrorText.Text = "Не удалось прочитать настройки автозагрузки Windows.";
+                StartupErrorText.Visibility = Visibility.Visible;
+            }
+            startupReady = true;
 		}
 
         private async void SaveMcp_Click(object sender, RoutedEventArgs e)

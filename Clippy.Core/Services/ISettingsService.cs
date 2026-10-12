@@ -13,6 +13,7 @@ namespace Clippy.Core.Services
         public int Tokens { get; set; }
         public string ServerUrl { get; set; }
         public string Model { get; set; }
+        public string SystemPrompt { get; set; }
         public int ClippySize { get; set; }
         public bool McpEnabled { get; set; }
         public string McpServerUrl { get; set; }

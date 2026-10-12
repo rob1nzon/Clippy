@@ -62,8 +62,17 @@ namespace Clippy.Core.ViewModels
 
 		private void SetupChat()
 		{
-			Messages.Add(new Message(Role.System, Constants.DEFAULT_SYSTEM_PROMPT));
+            UpdateSystemPrompt();
 		}
+
+        private void UpdateSystemPrompt()
+        {
+            // Keep instructions out of the visible history; replace, never stack them.
+            for (var index = Messages.Count - 1; index >= 0; index--)
+                if (Messages[index].Role == Role.System) Messages.RemoveAt(index);
+            if (!string.IsNullOrWhiteSpace(SettingsService.SystemPrompt))
+                Messages.Insert(0, new Message(Role.System, SettingsService.SystemPrompt));
+        }
 
 		private MessageViewModel AddMessage(IMessage message)
 		{
@@ -82,6 +91,7 @@ namespace Clippy.Core.ViewModels
 			{
                 if (CanSendPrompt() && (!string.IsNullOrWhiteSpace(CurrentText) || CurrentScreenshot != null))
 				{
+                    UpdateSystemPrompt();
                     var userMessage = new Message(Role.User, string.IsNullOrWhiteSpace(CurrentText) ? "Что на этом скриншоте? Дай короткий полезный ответ." : CurrentText)
                     { ScreenshotJpeg = CurrentScreenshot };
                     var userVM = AddMessage(userMessage);

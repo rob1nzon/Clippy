@@ -11,6 +11,7 @@
     <Compile Include="../../Clippy/Services/SettingsStore.cs" Link="SettingsStore.cs" />
     <Compile Include="../../Clippy/Helpers/WindowInputRegion.cs" Link="WindowInputRegion.cs" />
     <Compile Include="../../Clippy/Services/MicrophoneRecorder.cs" Link="MicrophoneRecorder.cs" />
+    <Compile Include="../../Clippy/Services/StartupService.cs" Link="StartupService.cs" />
     <PackageReference Include="NAudio.WinMM" Version="2.2.1" />
   </ItemGroup>
 </Project>

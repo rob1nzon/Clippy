@@ -40,6 +40,7 @@ jobs:
         shell: pwsh
         run: |
           if (!(Test-Path artifacts/Clippy-win-x64/Clippy.exe)) { throw "Clippy.exe was not produced" }
+          if (!(Test-Path artifacts/Clippy-win-x64/Assets/Clippy/Clippy.ico)) { throw "Clippy window/tray icon is missing" }
       - uses: actions/upload-artifact@v4
         with:
           name: Clippy-win-x64

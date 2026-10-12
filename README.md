@@ -88,6 +88,19 @@ The client uses the [official MCP C# SDK](https://github.com/modelcontextprotoco
 with the stable `2025-11-25` protocol. See also
 [llama.cpp function calling](https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md).
 
+## System prompt, icon and startup (v0.7.0)
+
+Settings → **System prompt** lets you edit/save the main chat instruction or reset
+it to the default: `You are in an app that revives Microsoft Clippy in Windows. Speak in a Clippy style`.
+Changes apply to the next message without clearing history. An empty field disables
+the system message. Screen advice retains its separate fixed safety-focused instruction.
+
+The Clippy icon is embedded in the EXE and used for the main/settings windows and tray.
+Enable **Run on startup** in Settings to register launch at Windows sign-in for the
+current user (HKCU Run); it is off by default. Scoop installations use the stable
+`apps\clippy\current\Clippy.exe` path. Disable this option before uninstalling; if
+you previously created a `shell:startup` shortcut, remove that shortcut manually.
+
 ## Optional voice input (GigaAM, v0.6.0)
 
 In Settings, enable **Голосовой ввод (GigaAM)**, enter the full transcription URL,
@@ -192,7 +205,7 @@ right-click it for Show, Hide, Settings, and Exit. The tray can be disabled in
 Settings. The Clippy size slider changes the mascot from 60% to 200% and saves
 the choice. The window sits at the bottom-right of the current monitor's work
 area and adapts to DPI scaling, taskbar position and available screen height.
-To run on login, put a shortcut to `Clippy.exe` in the `shell:startup` folder.
+To run on login, enable **Run on startup** in Settings.
 See [Microsoft's self-contained deployment documentation](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/self-contained-deploy/deploy-self-contained-apps).
 
 <hr>
