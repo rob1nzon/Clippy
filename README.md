@@ -142,6 +142,35 @@ llama-server -m vision-model.gguf --mmproj matching-mmproj.gguf --host 0.0.0.0 -
 
 See the [llama.cpp multimodal documentation](https://github.com/ggml-org/llama.cpp/blob/master/docs/multimodal.md).
 
+## Scoop installation and updates
+
+With Scoop already installed, run in PowerShell:
+
+```powershell
+scoop bucket add clippy-lan https://github.com/rob1nzon/Clippy
+scoop install clippy-lan/clippy
+```
+
+Launch `clippy` or **Clippy LAN** from the Start menu. Before updating, close any
+running copy via the tray menu → **Exit**, then run:
+
+```powershell
+scoop update
+scoop update clippy
+```
+
+This bucket currently supports Windows x64 only. The complete portable build and
+its dependencies are installed; no separate .NET or Windows App SDK install is
+needed. Settings in `%LOCALAPPDATA%\Clippy` and keys in Windows Credential Locker
+survive updates and uninstall. A manually extracted copy is not managed by Scoop;
+install through the bucket once and use that copy afterward. If a login shortcut
+points to an old ZIP directory, change it to Scoop's **Clippy LAN** shortcut.
+
+The release workflow updates `bucket/clippy.json` with the published version and
+the actual ZIP's SHA256 after creating each release. Merely publishing a tag or
+setting `checkver` is not enough: the tracked manifest must be updated. Scoop CI
+checks a real install and upgrade plus preservation of the settings file.
+
 ## Build / download Windows EXE
 
 In your fork, open **Actions → Build Clippy EXE → Run workflow** and select your

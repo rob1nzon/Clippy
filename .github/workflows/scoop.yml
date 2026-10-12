@@ -1,0 +1,26 @@
+name: Test Scoop installation
+
+on:
+  push:
+    branches: [master, main]
+    paths: ['bucket/**', 'scripts/*Scoop*', '.github/workflows/scoop.yml']
+  pull_request:
+    paths: ['bucket/**', 'scripts/*Scoop*', '.github/workflows/scoop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scoop:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ScoopInstaller/Scoop
+          ref: e6aa3b366bdee8ed138c1e0f7b85192ebdd35d0f
+          path: .scoop-test-tools
+      - name: Install and upgrade portable Clippy through Scoop
+        shell: pwsh
+        run: ./scripts/Test-Scoop.ps1 -ScoopRoot "${{ github.workspace }}/.scoop-test-tools"
