@@ -19,7 +19,7 @@
     mc:Ignorable="d">
     <Grid x:Name="Background" BorderBrush="{ThemeResource MicaBorderBrush}" BorderThickness="0">
         <Grid.Resources>
-            <Style x:Key="AnimatedClippyToggleButton" TargetType="ToggleButton" BasedOn="{ThemeResource ClippyToggleButton}">
+            <Style x:Key="AnimatedClippyToggleButton" TargetType="ToggleButton" BasedOn="{StaticResource ClippyToggleButton}">
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="ToggleButton">
