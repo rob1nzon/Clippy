@@ -37,6 +37,31 @@ namespace Clippy
         private SettingsService Settings = (SettingsService)App.Current.Services.GetService<ISettingsService>();
         private ScreenAdviceController Advice = App.Current.Services.GetRequiredService<ScreenAdviceController>();
 
+        private void VoiceInput_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (VoiceInputSwitch != null && !VoiceInputSwitch.IsOn) Settings.VoiceInputEnabled = false;
+        }
+
+        private void SaveVoiceInput_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var url = SpeechUrlBox.Text.Trim();
+                SpeechService.ValidateEndpoint(url);
+                if (string.IsNullOrWhiteSpace(SpeechModelBox.Text))
+                { SpeechConnectionStatus.Text = "Укажите STT model / alias (например gigaam)."; return; }
+                // Stop any current recording before changing destination or credentials.
+                App.Current.Services.GetRequiredService<VoiceInputController>().Cancel();
+                new KeyService("Clippy.Speech").SetKey(SpeechKeyBox.Password);
+                var enabled = VoiceInputSwitch.IsOn;
+                Settings.SpeechServerUrl = url;
+                Settings.SpeechModel = SpeechModelBox.Text.Trim();
+                Settings.VoiceInputEnabled = enabled;
+                SpeechConnectionStatus.Text = enabled ? "Сохранено. Нажмите микрофон в чате для записи." : "Голосовой ввод выключен.";
+            }
+            catch (Exception) { SpeechConnectionStatus.Text = "Не удалось сохранить. Проверьте полный HTTP URL и ключ."; }
+        }
+
         private void ScreenAdvice_Toggled(object sender, RoutedEventArgs e)
         {
             // Switching off takes effect immediately, even before Save is clicked.
@@ -76,6 +101,7 @@ namespace Clippy
             SetTitleBar(AppTitleBar);
             ServerKeyBox.Password = App.Current.Services.GetRequiredService<IKeyService>().GetKey();
             McpKeyBox.Password = new KeyService("Clippy.MCP").GetKey();
+            SpeechKeyBox.Password = new KeyService("Clippy.Speech").GetKey();
             StartupToggle.IsEnabled = false;
             StartupErrorText.Text = "For this EXE, add a shortcut to shell:startup to run on login.";
             StartupErrorText.Visibility = Visibility.Visible;

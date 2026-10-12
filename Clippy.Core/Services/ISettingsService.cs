@@ -18,5 +18,8 @@ namespace Clippy.Core.Services
         public string McpServerUrl { get; set; }
         public bool ScreenAdviceEnabled { get; set; }
         public int ScreenAdviceIntervalMinutes { get; set; }
+        public bool VoiceInputEnabled { get; set; }
+        public string SpeechServerUrl { get; set; }
+        public string SpeechModel { get; set; }
     }
 }

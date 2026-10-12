@@ -80,6 +80,10 @@ namespace Clippy
             services.AddSingleton<IToolService>(provider => new McpToolService(
                 provider.GetRequiredService<ISettingsService>(), () => new KeyService("Clippy.MCP").GetKey()));
             services.AddSingleton<ClippyViewModel>();
+            services.AddSingleton(provider => new SpeechService(provider.GetRequiredService<ISettingsService>(), new KeyService("Clippy.Speech")));
+            services.AddSingleton<IVoiceRecorder, MicrophoneRecorder>();
+            services.AddSingleton(provider => new VoiceInputController(provider.GetRequiredService<ISettingsService>(),
+                provider.GetRequiredService<IVoiceRecorder>(), provider.GetRequiredService<SpeechService>().TranscribeAsync));
             services.AddSingleton(provider => new ScreenAdviceController(provider.GetRequiredService<ISettingsService>(),
                 ((ChatService)provider.GetRequiredService<IChatService>()).AnalyzeScreenAsync));
 
@@ -128,6 +132,7 @@ namespace Clippy
         {
             if (IsExiting) return;
             IsExiting = true;
+            Services.GetRequiredService<VoiceInputController>().Cancel();
             Services.GetRequiredService<ScreenAdviceController>().Reset();
             Services.GetRequiredService<ClippyViewModel>().SendPromptCommand.Cancel();
             m_window?.DisposeTray();

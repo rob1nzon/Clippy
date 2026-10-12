@@ -106,12 +106,16 @@ try
     Assert(!(bool)store.Get("ScreenAdviceEnabled", false) && (int)store.Get("ScreenAdviceIntervalMinutes", 15) == 15,
         "screen advice defaults off with fifteen minute interval");
     store.Values["ScreenAdviceEnabled"] = true;
+    Assert(!(bool)store.Get("VoiceInputEnabled", false), "voice input defaults off");
+    store.Values["VoiceInputEnabled"] = true;
+    store.Values["SpeechServerUrl"] = "http://192.168.1.20:8016/custom/asr";
     store.Values["ScreenAdviceIntervalMinutes"] = 30;
     store.Values["ServerUrl"] = "http://192.168.1.20:8080/v1";
     store.Values["Tokens"] = 1024;
     store.Values["AutoPin"] = false;
     store.Save();
     var reloaded = new SettingsStore(path);
+    Assert((bool)reloaded.Get("VoiceInputEnabled", false) && (string)reloaded.Get("SpeechServerUrl", "") == "http://192.168.1.20:8016/custom/asr", "voice opt-in and custom endpoint survive restart");
     Assert((bool)reloaded.Get("ScreenAdviceEnabled", false) && (int)reloaded.Get("ScreenAdviceIntervalMinutes", 15) == 30,
         "screen advice consent and interval survive restart");
     Assert((string)reloaded.Get("ServerUrl", "") == "http://192.168.1.20:8080/v1" &&
@@ -174,6 +178,7 @@ await Throws<InvalidOperationException>(() => mcp.CallToolAsync("echo", "{}"), "
 Console.WriteLine("All MCP checks passed.");
 await ScreenAdviceChecks.Run(Assert);
 await AttachmentChecks.Run(Assert);
+await VoiceChecks.Run(Assert);
 if (OperatingSystem.IsWindows()) WindowRegionChecks.Run(Assert);
 
 sealed class Settings : ISettingsService
@@ -190,6 +195,9 @@ sealed class Settings : ISettingsService
     public string Model { get; set; } = "local-model";
     public bool ScreenAdviceEnabled { get; set; }
     public int ScreenAdviceIntervalMinutes { get; set; } = 15;
+    public bool VoiceInputEnabled { get; set; }
+    public string SpeechServerUrl { get; set; } = "http://localhost:8000/v1/audio/transcriptions";
+    public string SpeechModel { get; set; } = "gigaam";
 }
 
 sealed class Keys : IKeyService

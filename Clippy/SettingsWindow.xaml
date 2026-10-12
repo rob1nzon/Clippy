@@ -82,6 +82,17 @@
                     </StackPanel>
                     <TextBlock FontSize="14" FontWeight="SemiBold" Margin="4, 28, 4, 2">Clippy Options</TextBlock>
                     <StackPanel Spacing="12" Margin="4,12,4,20">
+                        <ToggleSwitch x:Name="VoiceInputSwitch" Header="Голосовой ввод (GigaAM)" IsOn="{x:Bind Settings.VoiceInputEnabled, Mode=OneWay}" Toggled="VoiceInput_Toggled"/>
+                        <TextBox x:Name="SpeechUrlBox" Header="Полный URL распознавания" PlaceholderText="http://192.168.1.10:8000/v1/audio/transcriptions"
+                                 Text="{x:Bind Settings.SpeechServerUrl, Mode=OneWay}"/>
+                        <TextBox x:Name="SpeechModelBox" Header="STT model / alias" Text="{x:Bind Settings.SpeechModel, Mode=OneWay}"/>
+                        <PasswordBox x:Name="SpeechKeyBox" Header="Ключ GigaAM / STT (необязательно)"/>
+                        <TextBlock Text="Выключено по умолчанию. Микрофон записывает только после нажатия кнопки, максимум 60 секунд. Повторное нажатие завершает запись и отправляет WAV на этот URL; ответ JSON с полем text добавляется в ввод, без отправки сообщения. Аудио хранится только в памяти, но сервер может его сохранять. Нужен HTTP API с multipart file/model/response_format, например /v1/audio/transcriptions."
+                                   TextWrapping="Wrap"/>
+                        <Button Content="Сохранить голосовой ввод" Click="SaveVoiceInput_Click"/>
+                        <TextBlock x:Name="SpeechConnectionStatus" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <StackPanel Spacing="12" Margin="4,12,4,20">
                         <ToggleSwitch x:Name="ScreenAdviceSwitch" Header="Optional screen advice" IsOn="{x:Bind Settings.ScreenAdviceEnabled, Mode=OneWay}" Toggled="ScreenAdvice_Toggled"/>
                         <NumberBox x:Name="ScreenAdviceIntervalBox" Header="Capture interval (minutes)" Value="{x:Bind Settings.ScreenAdviceIntervalMinutes, Mode=OneWay}"
                                    Minimum="5" Maximum="60" SmallChange="5" SpinButtonPlacementMode="Inline"/>

@@ -39,6 +39,10 @@ namespace Clippy.Core.ViewModels
         [NotifyCanExecuteChangedFor(nameof(SendPromptCommand))]
         private bool isCapturingScreenshot;
 
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(SendPromptCommand))]
+        private bool isVoiceInputBusy;
+
         public int ConversationRevision { get; private set; }
 
 		[ObservableProperty]
@@ -69,14 +73,14 @@ namespace Clippy.Core.ViewModels
 			return ViewModel;
 		}
 
-        private bool CanSendPrompt() => !IsCapturingScreenshot;
+        private bool CanSendPrompt() => !IsCapturingScreenshot && !IsVoiceInputBusy;
 
 		[RelayCommand(IncludeCancelCommand = true, CanExecute = nameof(CanSendPrompt))]
 		public async Task SendPrompt(CancellationToken cancellationToken)
 		{
 			try
 			{
-				if (!IsCapturingScreenshot && (!string.IsNullOrWhiteSpace(CurrentText) || CurrentScreenshot != null))
+                if (CanSendPrompt() && (!string.IsNullOrWhiteSpace(CurrentText) || CurrentScreenshot != null))
 				{
                     var userMessage = new Message(Role.User, string.IsNullOrWhiteSpace(CurrentText) ? "Что на этом скриншоте? Дай короткий полезный ответ." : CurrentText)
                     { ScreenshotJpeg = CurrentScreenshot };

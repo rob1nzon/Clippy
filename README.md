@@ -88,6 +88,27 @@ The client uses the [official MCP C# SDK](https://github.com/modelcontextprotoco
 with the stable `2025-11-25` protocol. See also
 [llama.cpp function calling](https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md).
 
+## Optional voice input (GigaAM, v0.6.0)
+
+In Settings, enable **Голосовой ввод (GigaAM)**, enter the full transcription URL,
+STT model/alias and optional independent API key, then save. Example URL:
+`http://192.168.1.10:8000/v1/audio/transcriptions`. No path is appended; the URL
+can point to a custom endpoint with the same request/response format.
+
+Click the microphone in chat to start recording with the Windows default input
+device, then click it again to stop and transcribe. Recording stops automatically
+after 60 seconds. Text is appended to the draft, not sent to the chat model.
+Use × to cancel. Hiding/collapsing chat, resetting the conversation, disabling the
+option or changing speech settings cancels the current operation. Nothing listens
+before you click the microphone. Check Windows microphone privacy settings if capture
+fails. Audio is held in memory only; the configured server may retain uploaded audio.
+
+Supported API: multipart POST fields `file` (PCM WAV, 16 kHz, mono, 16-bit), `model`,
+`response_format=json`; response `{"text":"recognized speech"}`. A raw GigaAM model
+or CLI needs an HTTP wrapper; SSE/WebSocket and arbitrary JSON APIs are not supported.
+One example implementation documents this endpoint in
+[gigaam-asr-russian](https://github.com/x0152/gigaam-asr-russian#api).
+
 ## Optional screen advice (v0.4.0)
 
 In Settings → **Optional screen advice**, turn the switch on, choose an interval

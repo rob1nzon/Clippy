@@ -62,6 +62,7 @@ namespace Clippy
         private bool toolDialogOpen;
         private bool contextMenuOpen;
         private readonly ScreenAdviceController advice = App.Current.Services.GetRequiredService<ScreenAdviceController>();
+        private readonly VoiceInputController voice = App.Current.Services.GetRequiredService<VoiceInputController>();
         private readonly DispatcherTimer adviceTimer = new() { Interval = TimeSpan.FromSeconds(30) };
         private readonly DispatcherTimer adviceDismissTimer = new() { Interval = TimeSpan.FromSeconds(25) };
         private CancellationTokenSource screenshotCapture;
@@ -96,6 +97,9 @@ namespace Clippy
 			else Unpin();
             Clippy.PropertyChanged += ClippyChanged;
             advice.PropertyChanged += AdviceChanged;
+            voice.PropertyChanged += VoiceChanged;
+            voice.Transcribed += VoiceTranscribed;
+            Clippy.IsVoiceInputBusy = voice.IsBusy;
             advice.Reset();
             adviceTimer.Tick += async (_, _) => await RequestScreenAdviceAsync(false);
             adviceDismissTimer.Tick += (_, _) => advice.Dismiss();
@@ -121,9 +125,12 @@ namespace Clippy
             {
                 isClosed = true;
                 screenshotCapture?.Cancel();
+                voice.Cancel();
                 Settings.PropertyChanged -= SettingsChanged;
                 Clippy.PropertyChanged -= ClippyChanged;
                 advice.PropertyChanged -= AdviceChanged;
+                voice.PropertyChanged -= VoiceChanged;
+                voice.Transcribed -= VoiceTranscribed;
                 adviceTimer.Stop();
                 adviceDismissTimer.Stop();
                 advice.Reset();
@@ -144,7 +151,7 @@ namespace Clippy
         {
             var handle = this.GetWindowHandle();
             var allowed = !App.Current.IsExiting && ScreenCaptureService.IsVisible(handle) &&
-                (manual || !Clippy.IsClippyEnabled) && !Clippy.SendPromptCommand.IsRunning && !Clippy.IsCapturingScreenshot &&
+                (manual || !Clippy.IsClippyEnabled) && !Clippy.SendPromptCommand.IsRunning && !Clippy.IsCapturingScreenshot && !voice.IsBusy &&
                 Clippy.CurrentScreenshot == null && string.IsNullOrEmpty(Clippy.CurrentText) &&
                 !toolDialogOpen && !contextMenuOpen && (manual || !ScreenCaptureService.IsOurForegroundWindow());
             return advice.RunAsync(token => ScreenCaptureService.CaptureJpegAsync(handle, token), allowed, manual);
@@ -162,10 +169,40 @@ namespace Clippy
 
         private void DismissAdvice_Click(object sender, RoutedEventArgs e) => advice.Dismiss();
 
-        private bool CanRequestAdvice(bool enabled, bool adviceRunning, bool chatRunning, string draft, bool capturing, byte[] screenshot) =>
-            enabled && !adviceRunning && !chatRunning && !capturing && screenshot == null && string.IsNullOrEmpty(draft);
+        private bool CanRequestAdvice(bool enabled, bool adviceRunning, bool chatRunning, string draft, bool capturing, byte[] screenshot, bool voiceBusy) =>
+            enabled && !adviceRunning && !chatRunning && !capturing && !voiceBusy && screenshot == null && string.IsNullOrEmpty(draft);
 
-        private bool CanAttachScreenshot(bool chatRunning, bool capturing, bool adviceRunning) => !chatRunning && !capturing && !adviceRunning;
+        private bool CanAttachScreenshot(bool chatRunning, bool capturing, bool adviceRunning, bool voiceBusy) => !chatRunning && !capturing && !adviceRunning && !voiceBusy;
+
+        private bool CanUseVoice(bool chatRunning, bool capturing, bool adviceRunning, bool busy, bool recording) =>
+            recording || (!busy && !chatRunning && !capturing && !adviceRunning);
+
+        private void VoiceChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(voice.IsBusy)) Clippy.IsVoiceInputBusy = voice.IsBusy;
+            if (isClosed) return;
+            VoiceStatusPanel.Visibility = string.IsNullOrEmpty(voice.Status) ? Visibility.Collapsed : Visibility.Visible;
+            VoiceInputIcon.Symbol = voice.IsRecording ? CubeKit.UI.Icons.FluentSymbol.Stop20 : CubeKit.UI.Icons.FluentSymbol.MicOn20;
+        }
+
+        private void VoiceTranscribed(string text)
+        {
+            if (isClosed || App.Current.IsExiting) return;
+            // Flush x:Bind before appending so dictation never overwrites a newer edit.
+            Clippy.CurrentText = VoiceInputController.AppendToDraft(PromptBox.Text, text);
+            FocusPrompt();
+        }
+
+        private async void VoiceInput_Click(object sender, RoutedEventArgs e)
+        {
+            if (voice.IsRecording) { voice.StopRecording(); return; }
+            if (!Settings.VoiceInputEnabled || !CanUseVoice(Clippy.SendPromptCommand.IsRunning, Clippy.IsCapturingScreenshot, advice.IsRunning, voice.IsBusy, voice.IsRecording)) return;
+            advice.Reset();
+            await voice.StartAsync();
+            if (!isClosed) FocusPrompt();
+        }
+
+        private void CancelVoice_Click(object sender, RoutedEventArgs e) { voice.Cancel(); FocusPrompt(); }
 
         private async void AdviceNow_Click(object sender, RoutedEventArgs e) => await RequestScreenAdviceAsync(true);
 
@@ -177,7 +214,7 @@ namespace Clippy
 
         private async void AttachScreenshot_Click(object sender, RoutedEventArgs e)
         {
-            if (!CanAttachScreenshot(Clippy.SendPromptCommand.IsRunning, Clippy.IsCapturingScreenshot, advice.IsRunning)) return;
+            if (!CanAttachScreenshot(Clippy.SendPromptCommand.IsRunning, Clippy.IsCapturingScreenshot, advice.IsRunning, voice.IsBusy)) return;
             var destination = Settings.ServerUrl;
             var revision = Clippy.ConversationRevision;
             using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
@@ -230,6 +267,7 @@ namespace Clippy
 
         private void RefreshChat_Click(object sender, RoutedEventArgs e)
         {
+            voice.Cancel();
             screenshotCapture?.Cancel();
             ScreenshotStatus.Visibility = Visibility.Collapsed;
             FocusPrompt();
@@ -237,6 +275,7 @@ namespace Clippy
 
         private void HideClippy()
         {
+            voice.Cancel();
             screenshotCapture?.Cancel();
             advice.Reset();
             this.Hide();
@@ -259,6 +298,7 @@ namespace Clippy
             // once the actual state changed, otherwise the collapsed UI leaves a large HWND.
             if (e.PropertyName == nameof(Clippy.IsClippyEnabled))
             {
+                if (!Clippy.IsClippyEnabled) voice.Cancel();
                 PositionInCorner();
                 if (Clippy.IsClippyEnabled) FocusPrompt();
             }
@@ -294,6 +334,7 @@ namespace Clippy
 
         private void SettingsChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(Settings.VoiceInputEnabled) || e.PropertyName == nameof(Settings.SpeechServerUrl) || e.PropertyName == nameof(Settings.SpeechModel)) voice.Cancel();
             if (e.PropertyName == nameof(Settings.ServerUrl))
             {
                 screenshotCapture?.Cancel();

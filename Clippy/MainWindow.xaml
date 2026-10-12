@@ -141,6 +141,14 @@
                         </StackPanel>
                     </Border>
                     <TextBlock x:Name="ScreenshotStatus" Visibility="Collapsed" TextWrapping="Wrap" FontSize="11"/>
+                    <Grid x:Name="VoiceStatusPanel" Visibility="Collapsed" ColumnSpacing="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{x:Bind voice.Status, Mode=OneWay}" TextWrapping="Wrap" FontSize="11"/>
+                        <Button Grid.Column="1" Content="×" Click="CancelVoice_Click" Padding="4,0" VerticalAlignment="Top" ToolTipService.ToolTip="Отменить голосовой ввод"/>
+                    </Grid>
                 </StackPanel>
                 <Grid Grid.Row="1">
                     <ToolkitControls:DropShadowPanel BlurRadius="16.0" ShadowOpacity="0.43" IsMasked="True" CornerRadius="8" OffsetX="0.0" OffsetY="0.0" Color="Black">
@@ -170,14 +178,20 @@
                     <ToggleButton IsChecked="{x:Bind Clippy.IsPinned, Mode=TwoWay}" Style="{ThemeResource PinToggleButton}" Height="32" Width="40"/>
                     <Button Command="{x:Bind Clippy.RefreshChatCommand}" Click="RefreshChat_Click" Style="{ThemeResource RefreshButton}" Height="32" Width="40"/>
                     <Button x:Name="AdviceNowButton" Click="AdviceNow_Click" Height="32" Width="40" Style="{ThemeResource ToolbarButton}" AutomationProperties.Name="Advice now"
-                            IsEnabled="{x:Bind CanRequestAdvice(Settings.ScreenAdviceEnabled, advice.IsRunning, Clippy.SendPromptCommand.IsRunning, Clippy.CurrentText, Clippy.IsCapturingScreenshot, Clippy.CurrentScreenshot), Mode=OneWay}"
+                            IsEnabled="{x:Bind CanRequestAdvice(Settings.ScreenAdviceEnabled, advice.IsRunning, Clippy.SendPromptCommand.IsRunning, Clippy.CurrentText, Clippy.IsCapturingScreenshot, Clippy.CurrentScreenshot, voice.IsBusy), Mode=OneWay}"
                             ToolTipService.ToolTip="Advice now — совет по экрану. Включите Screen advice в настройках; завершите ответ и очистите ввод.">
                         <icons:FluentSymbolIcon Symbol="Lightbulb20"/>
                     </Button>
                     <Button x:Name="AttachScreenshotButton" Click="AttachScreenshot_Click" Height="32" Width="40" Style="{ThemeResource ToolbarButton}"
-                            IsEnabled="{x:Bind CanAttachScreenshot(Clippy.SendPromptCommand.IsRunning, Clippy.IsCapturingScreenshot, advice.IsRunning), Mode=OneWay}"
+                            IsEnabled="{x:Bind CanAttachScreenshot(Clippy.SendPromptCommand.IsRunning, Clippy.IsCapturingScreenshot, advice.IsRunning, voice.IsBusy), Mode=OneWay}"
                             AutomationProperties.Name="Прикрепить скриншот" ToolTipService.ToolTip="Прикрепить скриншот монитора к следующему сообщению. Нужна vision-модель.">
                         <icons:FluentSymbolIcon Symbol="Screenshot20"/>
+                    </Button>
+                    <Button x:Name="VoiceInputButton" Click="VoiceInput_Click" Height="32" Width="40" Style="{ThemeResource ToolbarButton}"
+                            Visibility="{x:Bind BtoV(Settings.VoiceInputEnabled), Mode=OneWay}" AutomationProperties.Name="Голосовой ввод"
+                            IsEnabled="{x:Bind CanUseVoice(Clippy.SendPromptCommand.IsRunning, Clippy.IsCapturingScreenshot, advice.IsRunning, voice.IsBusy, voice.IsRecording), Mode=OneWay}"
+                            ToolTipService.ToolTip="Голосовой ввод: нажмите для записи, ещё раз — остановить и распознать.">
+                        <icons:FluentSymbolIcon x:Name="VoiceInputIcon" Symbol="MicOn20"/>
                     </Button>
                 </StackPanel>
             </Grid>

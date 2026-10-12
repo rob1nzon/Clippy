@@ -74,6 +74,31 @@ namespace Clippy.Services
             }
         }
         private bool mcpEnabled = (bool)Settings.Get("McpEnabled", false);
+        private bool voiceInputEnabled = (bool)Settings.Get("VoiceInputEnabled", false);
+        public bool VoiceInputEnabled
+        {
+            get => voiceInputEnabled;
+            set { Settings.Values["VoiceInputEnabled"] = value; Settings.Save(); SetProperty(ref voiceInputEnabled, value); }
+        }
+
+        private string speechServerUrl = (string)Settings.Get("SpeechServerUrl", "http://localhost:8000/v1/audio/transcriptions");
+        public string SpeechServerUrl
+        {
+            get => speechServerUrl;
+            set
+            {
+                if (value != speechServerUrl && VoiceInputEnabled) VoiceInputEnabled = false;
+                Settings.Values["SpeechServerUrl"] = value; Settings.Save(); SetProperty(ref speechServerUrl, value);
+            }
+        }
+
+        private string speechModel = (string)Settings.Get("SpeechModel", "gigaam");
+        public string SpeechModel
+        {
+            get => speechModel;
+            set { Settings.Values["SpeechModel"] = value; Settings.Save(); SetProperty(ref speechModel, value); }
+        }
+
         public bool McpEnabled
         {
             get => mcpEnabled;
