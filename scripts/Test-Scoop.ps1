@@ -52,7 +52,7 @@ New-Item -ItemType Directory -Path "$env:SCOOP/shims", "$env:SCOOP/buckets", "$e
 Get-ChildItem -LiteralPath $ScoopRoot -Force | Copy-Item -Destination $scoopCurrent -Recurse -Force
 '{}' | Set-Content -LiteralPath (Join-Path $env:SCOOP 'config.json')
 $scoop = Join-Path $scoopCurrent 'bin/scoop.ps1'
-& $scoop bucket add clippy-test $bucketSource
+& $scoop bucket add clippy-test ([Uri]::new($bucketSource).AbsoluteUri)
 if ($LASTEXITCODE -ne 0) { throw 'Bucket add failed.' }
 & $scoop install clippy-test/clippy
 if ($LASTEXITCODE -ne 0) { throw 'Scoop install failed.' }
