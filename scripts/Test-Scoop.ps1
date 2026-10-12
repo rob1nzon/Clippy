@@ -52,6 +52,8 @@ New-Item -ItemType Directory -Path "$env:SCOOP/shims", "$env:SCOOP/buckets", "$e
 Get-ChildItem -LiteralPath $ScoopRoot -Force | Copy-Item -Destination $scoopCurrent -Recurse -Force
 '{}' | Set-Content -LiteralPath (Join-Path $env:SCOOP 'config.json')
 $scoop = Join-Path $scoopCurrent 'bin/scoop.ps1'
+& $scoop bucket add main
+if ($LASTEXITCODE -ne 0) { throw 'Could not initialize the default Scoop bucket.' }
 & $scoop bucket add clippy-test ([Uri]::new($bucketSource).AbsoluteUri)
 if ($LASTEXITCODE -ne 0) { throw 'Bucket add failed.' }
 & $scoop install clippy-test/clippy
@@ -70,9 +72,13 @@ Copy-Item -LiteralPath $ManifestPath -Destination $fixture -Force
 git -C $bucketSource add bucket/clippy.json
 git -C $bucketSource commit -m 'test: current release'
 if ($LASTEXITCODE -ne 0) { throw 'Could not update test bucket.' }
+& $scoop update
+if ($LASTEXITCODE -ne 0) { throw 'Scoop bucket refresh failed.' }
 & $scoop update clippy
 if ($LASTEXITCODE -ne 0) { throw 'Scoop update failed.' }
-$installed = Get-Content "$appDir/manifest.json" -Raw | ConvertFrom-Json
+$installedManifest = Join-Path $appDir 'scoop-manifest.json'
+if (!(Test-Path $installedManifest)) { $installedManifest = Join-Path $appDir 'manifest.json' }
+$installed = Get-Content -LiteralPath $installedManifest -Raw | ConvertFrom-Json
 if ($installed.version -ne $manifest.version) { throw 'Scoop did not upgrade to the current version.' }
 if ((Get-FileHash -LiteralPath $settingsPath).Hash -ne $settingsHash) { throw 'Settings changed during upgrade.' }
 & $scoop uninstall clippy
