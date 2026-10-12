@@ -1,36 +1,36 @@
 {
-    "version": "0.6.0",
-    "description": "Clippy desktop assistant with LAN models, MCP tools, screenshots and GigaAM voice input",
-    "homepage": "https://github.com/rob1nzon/Clippy",
-    "license": "MIT",
-    "architecture": {
-        "64bit": {
-            "url": "https://github.com/rob1nzon/Clippy/releases/download/v0.6.0/Clippy-win-x64.zip",
-            "hash": "b75a02fcaed474cb5040bfdeea40f5c399d2d1c2cb51d55051381e5b50165e77"
-        }
-    },
-    "extract_dir": "Clippy-win-x64",
-    "bin": "Clippy.exe",
-    "shortcuts": [
-        [
-            "Clippy.exe",
-            "Clippy LAN"
-        ]
-    ],
-    "pre_install": "if (Get-Process -Name Clippy -ErrorAction SilentlyContinue) { throw 'Close Clippy via its tray menu > Exit before installing or updating.' }",
-    "pre_uninstall": "if (Get-Process -Name Clippy -ErrorAction SilentlyContinue) { throw 'Close Clippy via its tray menu > Exit before updating or uninstalling.' }",
-    "notes": [
-        "Run clippy or use the Clippy LAN Start menu shortcut.",
-        "Before updating, close Clippy via its tray menu > Exit.",
-        "Settings remain in %LOCALAPPDATA%\\Clippy; saved API keys remain in Windows Credential Locker.",
-        "Portable Windows x64 build; .NET and Windows App SDK are included."
-    ],
-    "checkver": "github",
-    "autoupdate": {
-        "architecture": {
-            "64bit": {
-                "url": "https://github.com/rob1nzon/Clippy/releases/download/v$version/Clippy-win-x64.zip"
-            }
-        }
+  "version": "0.6.1",
+  "description": "Clippy desktop assistant with LAN models, MCP tools, screenshots and GigaAM voice input",
+  "homepage": "https://github.com/rob1nzon/Clippy",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/rob1nzon/Clippy/releases/download/v0.6.1/Clippy-win-x64.zip",
+      "hash": "3f7f727ffadd101368892d96f4c9472af8a15b45b3170e061a4a8e4c85fe3df0"
     }
+  },
+  "extract_dir": "Clippy-win-x64",
+  "bin": "Clippy.exe",
+  "shortcuts": [
+    [
+      "Clippy.exe",
+      "Clippy LAN"
+    ]
+  ],
+  "pre_install": "if (Get-Process -Name Clippy -ErrorAction SilentlyContinue) { throw 'Close Clippy via its tray menu > Exit before installing or updating.' }",
+  "pre_uninstall": "if (Get-Process -Name Clippy -ErrorAction SilentlyContinue) { throw 'Close Clippy via its tray menu > Exit before updating or uninstalling.' }",
+  "notes": [
+    "Run clippy or use the Clippy LAN Start menu shortcut.",
+    "Before updating, close Clippy via its tray menu > Exit.",
+    "Settings remain in %LOCALAPPDATA%\\Clippy; saved API keys remain in Windows Credential Locker.",
+    "Portable Windows x64 build; .NET and Windows App SDK are included."
+  ],
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/rob1nzon/Clippy/releases/download/v$version/Clippy-win-x64.zip"
+      }
+    }
+  }
 }
