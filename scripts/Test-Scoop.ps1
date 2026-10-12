@@ -48,6 +48,7 @@ $env:SCOOP = Join-Path $testRoot 'scoop-home'
 $env:SCOOP_GLOBAL = Join-Path $testRoot 'scoop-global'
 $scoopCurrent = Join-Path $env:SCOOP 'apps/scoop/current'
 New-Item -ItemType Directory -Path $scoopCurrent -Force | Out-Null
+New-Item -ItemType Directory -Path "$env:SCOOP/shims", "$env:SCOOP/buckets", "$env:SCOOP/cache" -Force | Out-Null
 Get-ChildItem -LiteralPath $ScoopRoot -Force | Copy-Item -Destination $scoopCurrent -Recurse -Force
 '{}' | Set-Content -LiteralPath (Join-Path $env:SCOOP 'config.json')
 $scoop = Join-Path $scoopCurrent 'bin/scoop.ps1'
