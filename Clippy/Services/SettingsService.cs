@@ -26,6 +26,13 @@ namespace Clippy.Services
         }
 
         private bool trayClippy = (bool)Settings.Get("TrayClippy", true);
+        private bool animateClippy = (bool)Settings.Get("AnimateClippy", true);
+        public bool AnimateClippy
+        {
+            get => animateClippy;
+            set { Settings.Values["AnimateClippy"] = value; Settings.Save(); SetProperty(ref animateClippy, value); }
+        }
+
         public bool TrayClippy
         {
             get => trayClippy;

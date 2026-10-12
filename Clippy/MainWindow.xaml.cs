@@ -67,10 +67,12 @@ namespace Clippy
         private readonly DispatcherTimer adviceDismissTimer = new() { Interval = TimeSpan.FromSeconds(25) };
         private CancellationTokenSource screenshotCapture;
         private bool isClosed;
+        private readonly MascotAnimator mascotAnimation;
 
         public MainWindow()
         {
             this.InitializeComponent();
+            mascotAnimation = new MascotAnimator(ClippyArtwork, ClippyButton, () => Settings.AnimateClippy);
             AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "Clippy", "Clippy.ico"));
             m = new(this);
             unsafe
@@ -125,6 +127,7 @@ namespace Clippy
             Closed += (_, _) =>
             {
                 isClosed = true;
+                mascotAnimation.Dispose();
                 screenshotCapture?.Cancel();
                 voice.Cancel();
                 Settings.PropertyChanged -= SettingsChanged;
@@ -144,6 +147,7 @@ namespace Clippy
 
         public void OpenChatAndFocus()
         {
+            mascotAnimation.Resume();
             Clippy.IsClippyEnabled = true;
             FocusPrompt();
         }
@@ -276,6 +280,7 @@ namespace Clippy
 
         private void HideClippy()
         {
+            mascotAnimation.Suspend();
             voice.Cancel();
             screenshotCapture?.Cancel();
             advice.Reset();
@@ -335,6 +340,7 @@ namespace Clippy
 
         private void SettingsChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(Settings.AnimateClippy)) mascotAnimation.Refresh();
             if (e.PropertyName == nameof(Settings.VoiceInputEnabled) || e.PropertyName == nameof(Settings.SpeechServerUrl) || e.PropertyName == nameof(Settings.SpeechModel)) voice.Cancel();
             if (e.PropertyName == nameof(Settings.ServerUrl))
             {
@@ -384,6 +390,7 @@ namespace Clippy
             }
             if (e.Message.MessageId == 0x02e0 || e.Message.MessageId == 0x007e || e.Message.MessageId == 0x001a)
                 DispatcherQueue.TryEnqueue(PositionInCorner);
+            if (e.Message.MessageId == 0x001a) DispatcherQueue.TryEnqueue(mascotAnimation.Refresh);
             if (e.Message.MessageId == PInvoke.WM_ERASEBKGND)
             {
                 e.Handled = true;
@@ -436,7 +443,7 @@ namespace Clippy
                 var y = (int)Math.Floor(top * scale);
                 areas.Add(new WindowInputRegion.PixelArea(x, y, (int)Math.Ceiling(right * scale) - x, (int)Math.Ceiling(bottom * scale) - y));
             }
-            AddArea(VisualBounds(ClippyButton));
+            AddArea(VisualBounds(ClippyButton), MascotMotion.HitPadding);
             if (AdviceBubble.Visibility == Visibility.Visible) AddArea(VisualBounds(AdviceBubble), 4);
             if (Clippy.IsClippyEnabled)
             {

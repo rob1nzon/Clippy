@@ -15,6 +15,7 @@ namespace Clippy.Core.Services
         public string Model { get; set; }
         public string SystemPrompt { get; set; }
         public int ClippySize { get; set; }
+        public bool AnimateClippy { get; set; }
         public bool McpEnabled { get; set; }
         public string McpServerUrl { get; set; }
         public bool ScreenAdviceEnabled { get; set; }

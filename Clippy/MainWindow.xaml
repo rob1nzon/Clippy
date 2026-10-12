@@ -19,6 +19,44 @@
     mc:Ignorable="d">
     <Grid x:Name="Background" BorderBrush="{ThemeResource MicaBorderBrush}" BorderThickness="0">
         <Grid.Resources>
+            <Style x:Key="AnimatedClippyToggleButton" TargetType="ToggleButton" BasedOn="{ThemeResource ClippyToggleButton}">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Grid Background="Transparent">
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal"/>
+                                        <VisualState x:Name="PointerOver"/>
+                                        <VisualState x:Name="Pressed"/>
+                                        <VisualState x:Name="Disabled">
+                                            <VisualState.Setters><Setter Target="ArtworkPresenter.Opacity" Value="0.5"/></VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Checked">
+                                            <VisualState.Setters><Setter Target="Indicator.Visibility" Value="Visible"/></VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="CheckedPointerOver">
+                                            <VisualState.Setters><Setter Target="Indicator.Visibility" Value="Visible"/></VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="CheckedPressed">
+                                            <VisualState.Setters><Setter Target="Indicator.Visibility" Value="Visible"/></VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="CheckedDisabled">
+                                            <VisualState.Setters>
+                                                <Setter Target="Indicator.Visibility" Value="Visible"/>
+                                                <Setter Target="ArtworkPresenter.Opacity" Value="0.5"/>
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+                                <ContentPresenter x:Name="ArtworkPresenter" Content="{TemplateBinding Content}" Padding="0"/>
+                                <Ellipse x:Name="Indicator" Visibility="Collapsed" Width="6" Height="6" Margin="2"
+                                         Fill="{ThemeResource AccentFillColorDefaultBrush}" HorizontalAlignment="Right" VerticalAlignment="Bottom" IsHitTestVisible="False"/>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
             <DataTemplate x:Key="ClippyMessageTemplate" x:DataType="vmm:ClippyMessageViewModel">
                 <messages:ClippyMessage ViewModel="{x:Bind }" Margin="0, 8, 0, 8"/>
             </DataTemplate>
@@ -81,7 +119,7 @@
                 </Grid>
             </Border>
             <Grid Grid.Row="2">
-                <ToggleButton x:Name="ClippyButton" IsChecked="{x:Bind Clippy.IsClippyEnabled, Mode=TwoWay}" Style="{ThemeResource ClippyToggleButton}" Padding="0" HorizontalAlignment="Right">
+                <ToggleButton x:Name="ClippyButton" IsChecked="{x:Bind Clippy.IsClippyEnabled, Mode=TwoWay}" Style="{StaticResource AnimatedClippyToggleButton}" Padding="0" HorizontalAlignment="Right">
                     <ToggleButton.ContextFlyout>
                         <MenuFlyout x:Name="Flyout" Placement="Bottom" ShouldConstrainToRootBounds="False">
                             <MenuFlyout.SystemBackdrop>
@@ -122,7 +160,7 @@
                             </MenuFlyoutItem>
                         </MenuFlyout>
                     </ToggleButton.ContextFlyout>
-                    <Image Source="ms-appx:///Assets/Clippy/Clippy.png" Height="{x:Bind Settings.ClippySize, Mode=OneWay}" Width="{x:Bind Settings.ClippySize, Mode=OneWay}"/>
+                    <Image x:Name="ClippyArtwork" Source="ms-appx:///Assets/Clippy/Clippy.png" Height="{x:Bind Settings.ClippySize, Mode=OneWay}" Width="{x:Bind Settings.ClippySize, Mode=OneWay}"/>
                 </ToggleButton>
             </Grid>
             <Grid x:Name="ChatInputPanel" Grid.Row="3" Visibility="{x:Bind BtoV(Clippy.IsClippyEnabled), Mode=OneWay}"  VerticalAlignment="Bottom" HorizontalAlignment="Stretch">

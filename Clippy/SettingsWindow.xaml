@@ -129,6 +129,9 @@
                         <ToggleSwitch IsOn="{x:Bind Settings.KeyboardEnabled, Mode=TwoWay}" Style="{ThemeResource GlowSwitch}" OnContent="Win + Shift + C" HorizontalAlignment="Right" OffContent="Off"/>
                     </settings:SettingsBlockControl>
                     <TextBlock FontSize="14" FontWeight="SemiBold" Margin="4, 28, 4, 2">Personalisation Options</TextBlock>
+                    <settings:SettingsBlockControl Title="Clippy animation" Margin="2" Description="Лёгкое покачивание и реакция на наведение. Учитывает настройку эффектов анимации Windows.">
+                        <ToggleSwitch IsOn="{x:Bind Settings.AnimateClippy, Mode=TwoWay}" Style="{ThemeResource GlowSwitch}" OnContent="On" OffContent="Off" HorizontalAlignment="Right"/>
+                    </settings:SettingsBlockControl>
                     <settings:SettingsBlockControl Title="Clippy size" Margin="2" Description="Mascot size: 60% to 200%. Changes are saved automatically.">
                         <StackPanel Width="220" Spacing="4">
                             <Slider Minimum="60" Maximum="200" StepFrequency="10" Value="{x:Bind Settings.ClippySize, Mode=TwoWay}"/>

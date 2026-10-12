@@ -88,6 +88,14 @@ The client uses the [official MCP C# SDK](https://github.com/modelcontextprotoco
 with the stable `2025-11-25` protocol. See also
 [llama.cpp function calling](https://github.com/ggml-org/llama.cpp/blob/master/docs/function-calling.md).
 
+## Subtle mascot animation (v0.7.1)
+
+The mascot gently sways (±1° over five seconds) and lifts slightly on hover.
+Only the image transform animates; the HWND and button layout stay fixed.
+Animation pauses when Clippy is hidden, honors Windows animation-effects settings,
+and can be disabled in Settings → **Clippy animation**. The toggle is saved and
+defaults on. Existing artwork is reused; no frame timers or extra sprite sheets.
+
 ## System prompt, icon and startup (v0.7.0)
 
 Settings → **System prompt** lets you edit/save the main chat instruction or reset
