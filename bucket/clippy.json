@@ -1,12 +1,12 @@
 {
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Clippy desktop assistant with LAN models, MCP tools, screenshots and GigaAM voice input",
   "homepage": "https://github.com/rob1nzon/Clippy",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/rob1nzon/Clippy/releases/download/v0.7.0/Clippy-win-x64.zip",
-      "hash": "947ac766602ceb8e8aef3515bcea3b64136e09c906c86197960e756bdf141e80"
+      "url": "https://github.com/rob1nzon/Clippy/releases/download/v0.7.1/Clippy-win-x64.zip",
+      "hash": "a447172dd0350c7b720bb477e9b55d551ce98fae83295d3eb44b912f100eb3aa"
     }
   },
   "extract_dir": "Clippy-win-x64",
